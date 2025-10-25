@@ -1,6 +1,8 @@
-# imgbox
-
-![Logo](client/dist/box.svg)
+<div align="center">
+  <img src="client/dist/box.svg" alt="imgbox logo" width="100"/>
+  <h1>imgbox</h1>
+  <p>Your tagline or description here</p>
+</div>
 
 ## Installation
 
