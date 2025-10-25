@@ -1,0 +1,12 @@
+gunicorn
+flask
+flask-cors
+torch==2.8.0
+diffusers==0.35.1
+transformers==4.44.0
+bitsandbytes
+sentencepiece
+tokenizers==0.19.1
+torchvision
+protobuf
+scikit-learn
