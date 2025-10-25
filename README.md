@@ -1,3 +1,7 @@
+# imgbox
+
+![Logo](client/dist/box.svg)
+
 ## Installation
 
 Download code : 
