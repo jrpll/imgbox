@@ -14,6 +14,8 @@ cd client
 npm install
 ```
 
+Get a huggingface token, which you will put under .env file in server.
+
 ## Hosting on A100 virtual machine
 
 Prepare for production :
