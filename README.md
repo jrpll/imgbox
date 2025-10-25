@@ -1,7 +1,3 @@
-## imgbox
-
-An image editing toolbox developped to facilitate identification of people that died in violent conditions using generative facial reconstruction techniques.
-
 ## Installation
 
 Run git clone.
