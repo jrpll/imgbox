@@ -1,6 +1,10 @@
 ## Installation
 
-Run git clone https://github.com/jrpll/imgbox.git 
+Download code : 
+
+```bash
+git clone https://github.com/jrpll/imgbox.git 
+```
 
 Install python packages for backend :
 
