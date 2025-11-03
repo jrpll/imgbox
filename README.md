@@ -1,6 +1,4 @@
-<div align="center">
-  <img src="client/src/assets/imgbox.jpeg" alt="imgbox logo" width="100"/>
-</div>
+![imgbox logo](client/src/assets/imgbox.jpeg)
 
 ## Installation
 
