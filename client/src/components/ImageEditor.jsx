@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload, X, Download } from 'lucide-react';
-import boxIcon from '../assets/box.svg'  // Add this import at the top
+import { apiPost } from '../lib/api';
+import boxIcon from '../assets/box.svg?url'
 
 export default function ImageEditor() {
   const [image, setImage] = useState(null);
@@ -11,8 +12,8 @@ export default function ImageEditor() {
   const [isEditingSlider, setIsEditingSlider] = useState(false);
   const [scale, setScale] = useState(1);
   const fileInputRef = useRef(null);
-  const BOX_SIZE = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--box-size'));
-  const BOX_GAP = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--box-gap'));
+  const BOX_SIZE = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--box-size')) || 1024;
+  const BOX_GAP = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--box-gap')) || 16;
 
   useEffect(() => {
     const calculateScale = () => {
@@ -53,10 +54,7 @@ export default function ImageEditor() {
     formData.append('text2', text2);
 
     try {
-      const response = await fetch('http://35.208.53.156:8080/generate', {
-        method: 'POST',
-        body: formData,
-      });
+      const response = await apiPost('/generate', formData);
       const data = await response.blob();
       setResult(URL.createObjectURL(data));
     } catch (error) {
@@ -250,10 +248,7 @@ export default function ImageEditor() {
                   formData.append('slider', e.target.value);
 		  formData.append('text1', text1);  // ← ADD THIS
     		  formData.append('text2', text2);                  
-                  fetch('http://35.208.53.156:8080/edit', {
-                    method: 'POST',
-                    body: formData,
-                  })
+                  apiPost('/edit', formData)
                   .then(response => response.blob())
                   .then(data => {
                     setResult(URL.createObjectURL(data));

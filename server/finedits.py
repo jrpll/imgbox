@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import gc
 from sklearn.cluster import KMeans
 from torchvision.transforms.functional import gaussian_blur
+from tqdm import tqdm
 
 def logit_sampler(mean_logit : float = 0, std_logit : float = 1, batch_size : int = 10, device : str = "cuda", dtype = torch.bfloat16):
     u = torch.normal(mean=mean_logit, std=std_logit, size=(batch_size,), device=device, dtype = dtype)
@@ -190,7 +191,7 @@ class FINEdits:
         self,
         img,
         prompt,
-        num_train_steps = 50,
+        num_train_steps = 100,
         simulated_batch_size = 10,
         batch_size = 1,
         num_inversion_steps = 50,
@@ -209,7 +210,7 @@ class FINEdits:
             optimizer.zero_grad()
             z0 = torch.cat([self.z0]*batch_size)
             with torch.enable_grad():
-                for i in range(num_train_steps*int(simulated_batch_size/batch_size)):
+                for i in tqdm(range(num_train_steps*int(simulated_batch_size/batch_size))):
                     noise = torch.randn_like(z0)
                     sigmas = logit_sampler(batch_size = batch_size, dtype = torch.bfloat16)
                     t=torch.tensor(sigmas*1000,device="cuda", dtype = torch.bfloat16)

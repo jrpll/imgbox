@@ -1,60 +1,23 @@
 ![imgbox logo](client/src/assets/imgbox.jpeg)
 
-## Installation
+## Test app
 
-Download code : 
-
-```bash
-git clone https://github.com/jrpll/imgbox.git 
-```
-
-Install python packages for backend :
+Open UI
 
 ```bash
-pip install -r imgbox/server/requirements.txt
+~/imgbox/src-tauri/target/debug/app
 ```
-Then install the node packages for the frontend :
+
+Launch side car
 
 ```bash
-cd client
-npm install
+cd ~/imgbox/server && uv run python app.py
+
+## Todo
+
+- [ ] Settings UI — HuggingFace token input, local/remote mode switch
+- [ ] Model loading screen — poll `/health` on startup, show progress
+- [ ] PyInstaller — bundle FastAPI server into standalone binary (needed for local mode)
+- [ ] GitHub Actions — build installers (.deb, .AppImage, .exe, .dmg) on release
+- [ ] Code signing — Windows + macOS (requires paid certificates)
 ```
-
-Get a huggingface token, which you will put under .env file in server.
-
-## Hosting on A100 virtual machine
-
-Prepare for production :
-
-```bash
-npm run build
-```
-
-Launch the server : 
-
-```bash
-cd server
-nohup /gunicorn/parent/folder/gunicorn --timeout 600 -w 1 -b 0.0.0.0:8080 app:app
-```
-
-## Installing and running on 24GB VRAM (ex : RTX4090)
-
-Run :
-
-```bash 
-python server/app.py
-```
-
-Then, run :
-
-```bash
-cd client
-npm run dev
-```
-
-## TODO :
-
-- [ ] Add automatic face crop extraction
-- [ ] Add background remover
-- [ ] Add Kontext and PulID post processors
-- [ ] Revamp interface / unslop

@@ -1,2 +1,7 @@
 client/node_modules/
+client/dist/
 server/.env
+server/__pycache__/
+server/assets/
+src-tauri/target/
+src-tauri/binaries/

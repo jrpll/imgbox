@@ -1,6 +1,6 @@
-gunicorn
-flask
-flask-cors
+fastapi
+uvicorn[standard]
+python-multipart
 torch==2.8.0
 diffusers==0.35.1
 transformers==4.44.0
@@ -10,3 +10,4 @@ tokenizers==0.19.1
 torchvision
 protobuf
 scikit-learn
+matplotlib
