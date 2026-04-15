@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Upload, X, Download } from 'lucide-react';
 import { apiPost } from '../lib/api';
-import boxIcon from '../assets/box.svg?url'
+import boxIconRaw from '../assets/box.svg?raw'
 
 export default function ImageEditor() {
   const [image, setImage] = useState(null);
@@ -10,6 +10,7 @@ export default function ImageEditor() {
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingSlider, setIsEditingSlider] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [scale, setScale] = useState(1);
   const fileInputRef = useRef(null);
   const BOX_SIZE = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--box-size')) || 1024;
@@ -43,6 +44,28 @@ export default function ImageEditor() {
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
+
+  useEffect(() => {
+    let unlisten;
+    (async () => {
+      try {
+        const { listen } = await import('@tauri-apps/api/event');
+        const { invoke } = await import('@tauri-apps/api/core');
+        unlisten = await listen('tauri://drag-drop', async (event) => {
+          const path = event.payload.paths?.[0];
+          if (!path) return;
+          const ext = path.split('.').pop().toLowerCase();
+          const mimeMap = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' };
+          if (!mimeMap[ext]) return;
+          const bytes = await invoke('read_file', { path });
+          const blob = new Blob([new Uint8Array(bytes)], { type: mimeMap[ext] });
+          setImage(new File([blob], path.split('/').pop(), { type: mimeMap[ext] }));
+          setIsDragging(false);
+        });
+      } catch { /* browser fallback */ }
+    })();
+    return () => { unlisten?.(); };
+  }, []);
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault();
@@ -82,7 +105,7 @@ export default function ImageEditor() {
         <div style={{ width: `${BOX_SIZE * scale * 2 + BOX_GAP}px` }}>
           <div className="flex items-center gap-3">
             <h1 className="text-4xl font-bold">imgbox</h1>
-            <img src={boxIcon} alt="imgbox logo" className="w-10 h-10" />
+            <span className="w-10 h-10 block" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="40" height="40"') }} />
           </div>
         </div>
       </div>
@@ -93,10 +116,12 @@ export default function ImageEditor() {
             {/* Input Image Section */}
             <div style={wrapperStyle}>
               <div className="relative">
-                <div 
+                <div
                   onClick={handleUploadClick}
+                  onDragEnter={() => setIsDragging(true)}
+                  onDragLeave={() => setIsDragging(false)}
                   style={imageContainerStyle}
-                  className="flex items-center justify-center border-2 border-gray-500 rounded-lg cursor-pointer overflow-hidden"
+                  className={`flex items-center justify-center border-2 rounded-lg cursor-pointer overflow-hidden ${isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-500'}`}
                 >
                   {image ? (
                     <div className="relative w-full h-full">

@@ -1,5 +1,22 @@
 # Devlog
 
+## 2026-04-15 — Dev environment fixes + image drag-and-drop
+
+### Dev environment
+- `src-tauri/tauri.conf.json`: fixed `beforeDevCommand` path from `cd ../client` to `cd client` — Tauri v2 CLI runs the command from the workspace root, not from `src-tauri/`
+- `client/vite.config.js`: added `server: { port: 5173, strictPort: true }` — prevents Vite from silently switching to port 5174 when a stale process holds 5173, which caused blank pages on every other launch
+
+### Drag-and-drop image input (`client/src/components/ImageEditor.jsx`)
+- Added drag-and-drop support to the left image box
+- On Linux, Tauri intercepts OS-level file drops before they reach the WebView, so the HTML `onDrop` event never fires. Fixed by listening to `tauri://drag-drop` instead
+- Added `read_file` Tauri command (`src-tauri/src/lib.rs`) that reads a file path and returns its bytes — used to convert the dropped file path into a `File` object in the frontend
+- Visual highlight (blue border) on drag-enter/leave kept via HTML drag events, which do fire in the WebView
+
+### SVG import fix (`client/src/components/ImageEditor.jsx`)
+- WebKitGTK (Tauri's WebView on Linux) rejects ES module imports served with `Content-Type: image/svg+xml`, causing React to fail to mount and the window to show blank
+- Fixed by switching from `import boxIcon from '../assets/box.svg?url'` to `import boxIconRaw from '../assets/box.svg?raw'` — `?raw` makes Vite return the SVG content as a JS string, no MIME type issue
+- Rendered inline via `dangerouslySetInnerHTML` with the SVG width/height overridden to 40px
+
 ## 2026-04-14 — Overhaul: Flask → FastAPI + Tauri
 
 ### Goal

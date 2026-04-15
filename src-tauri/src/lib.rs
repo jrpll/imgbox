@@ -37,6 +37,11 @@ fn save_config(app: &AppHandle, config: &ServerConfig) {
 }
 
 #[tauri::command]
+fn read_file(path: String) -> Result<Vec<u8>, String> {
+    std::fs::read(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn get_server_config(app: AppHandle) -> ServerConfig {
     load_config(&app)
 }
@@ -91,7 +96,7 @@ pub fn run() {
                 sidecar::stop(window.app_handle());
             }
         })
-        .invoke_handler(tauri::generate_handler![get_server_config, set_server_config])
+        .invoke_handler(tauri::generate_handler![read_file, get_server_config, set_server_config])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
