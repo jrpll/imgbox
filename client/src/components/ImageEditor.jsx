@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Upload, X, Download } from 'lucide-react';
 import { apiPost } from '../lib/api';
 import boxIconRaw from '../assets/box.svg?raw'
+import ThreeSpinner from './ThreeSpinner';
 
 export default function ImageEditor() {
   const [image, setImage] = useState(null);
@@ -165,8 +166,9 @@ export default function ImageEditor() {
                 className="flex items-center justify-center border-2 border-gray-500 rounded-lg overflow-hidden"
               >
                 {isLoading ? (
-                  <div className="text-center">
-                    <span className="block text-sm text-gray-600">Processing...</span>
+                  <div className="flex items-center justify-center w-full h-full gap-2">
+                    <ThreeSpinner size={60} />
+                    <span className="text-gray-400 text-3xl">processing...</span>
                   </div>
                 ) : result ? (
                   <div className="relative w-full h-full">

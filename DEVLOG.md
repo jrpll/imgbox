@@ -1,5 +1,16 @@
 # Devlog
 
+## 2026-04-20 — Three.js WebGPU spinner
+
+### Loading state (`client/src/components/ImageEditor.jsx`)
+- Replaced the plain "Processing..." text in the result box with an inline spinner + "processing..." label
+- Spinner sits to the left of the label; both are styled `text-gray-400 text-3xl` to match the "resultado" placeholder
+
+### Spinner (`client/src/spinners/spinner.js`, `client/src/components/ThreeSpinner.jsx`)
+- Added `three` as a dependency
+- `spinner.js`: Three.js WebGPU/TSL `Points` object drawing a hypotrochoid (spirograph) curve with a travelling particle trail. Uses `NormalBlending` so it renders correctly on the white background. Particle color matches Tailwind gray-400.
+- `ThreeSpinner.jsx`: React component that mounts a `WebGPURenderer` onto a `<canvas>` ref, sets up an orthographic camera and animation loop, and cleans up on unmount. Three.js falls back to WebGL2 automatically when WebGPU is unavailable.
+
 ## 2026-04-15 — Dev environment fixes + image drag-and-drop
 
 ### Dev environment
