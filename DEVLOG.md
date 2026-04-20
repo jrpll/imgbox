@@ -1,5 +1,17 @@
 # Devlog
 
+## 2026-04-20 — UI redesign: two-panel card layout
+
+### Layout (`client/src/components/ImageEditor.jsx`, `client/src/App.jsx`)
+- Replaced the old layout (two full-size image boxes side by side, inputs below) with a two-panel card layout that fills the viewport
+- Left card (Input): image upload thumbnail, source and target description textareas, structure-preservation slider, Reset / Run buttons
+- Right card (Result): fills remaining space; Download button appears in the card header once a result exists
+- Both cards are `rounded-xl border border-gray-200` floating on a white padded background — no hard dividing lines
+- Slider moved inside the Input card (below the textareas); fixed rendering by removing `appearance-none` which was stripping native browser styles
+- Image thumbnail given 12 px breathing room from the box edges (`max-w/max-h calc(100% - 24px)`)
+- Delete / clear buttons unified to the same small size (`p-0.5`, `X size={12}`) across image upload and text fields
+- Processing spinner made inline (row layout) next to "Processing…" label instead of stacked above it
+
 ## 2026-04-20 — Three.js WebGPU spinner
 
 ### Loading state (`client/src/components/ImageEditor.jsx`)
