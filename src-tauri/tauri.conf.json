@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.imgbox.desktop",
   "build": {
-    "frontendDist": "../client/dist",
+    "frontendDist": "../frontend/dist",
     "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "cd client && npm run dev",
-    "beforeBuildCommand": "cd client && npm run build"
+    "beforeDevCommand": "cd frontend && npm run dev",
+    "beforeBuildCommand": "cd frontend && npm run build"
   },
   "app": {
     "windows": [

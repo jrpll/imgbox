@@ -25,7 +25,7 @@ cd server && uv run uvicorn app:app --reload --port 8080
 
 **Frontend** (separate terminal):
 ```bash
-cd client && npm run dev
+cd frontend && npm run dev
 # → http://localhost:5173
 ```
 
@@ -36,12 +36,16 @@ The Tauri app bundles both, but for dev you run them separately and hit localhos
 ## Architecture
 
 ```
-client/src/
+frontend/src/
 ├── App.jsx                  # Routes between Setup and ImageEditor
 ├── components/
-│   ├── ImageEditor.jsx      # Main UI: upload, text inputs, result, slider
+│   ├── ImageEditor.jsx      # Two-card shell: header + mode dropdown,
+│   │                          shared image upload, mode dispatch, result viewer
 │   ├── Setup.jsx            # First-run HF token entry
-│   └── ThreeSpinner.jsx     # WebGPU canvas spinner (shown while isLoading)
+│   ├── ThreeSpinner.jsx     # WebGPU canvas spinner (shown while isLoading)
+│   └── modes/
+│       ├── Edit.jsx         # 'edit' mode: text1 + text2 + structure slider
+│       └── RemoveBackground.jsx  # 'remove background' mode (stub)
 ├── lib/api.js               # Fetch wrapper — reads server URL from Tauri store
 │                            # or VITE_API_URL env, falls back to 127.0.0.1:8080
 └── spinners/spinner.js      # Three.js TSL hypotrochoid Points object
@@ -54,6 +58,24 @@ src-tauri/src/
 ├── lib.rs                   # Tauri commands + ServerConfig store
 └── sidecar.rs               # Spawns/kills the FastAPI server as a child process
 ```
+
+### Mode contract
+
+Each file under `components/modes/` exports a config object:
+
+```js
+{
+  label: string,                      // shown in the mode dropdown
+  initialState: object,               // mode's input state (e.g. { text1, text2, slider })
+  Inputs: ({ state, setState, result, onResult, onEditingSlider }) => JSX,
+  submit: async ({ image, state }) => string,   // returns a result blob URL
+  canSubmit: ({ image, state }) => boolean,
+}
+```
+
+`ImageEditor.jsx` owns `image`, `result`, `isLoading`, `isEditingSlider`, and `modeState` (opaque per-mode). It renders the mode's `Inputs`, computes `canRun = !isLoading && cfg.canSubmit(...)`, and wires the shared Run/Reset buttons to `cfg.submit` and `cfg.initialState`. Modes do not call refs and do not plumb readiness up via callbacks — derive from state.
+
+To add a mode: drop a new file under `components/modes/`, register it in the `MODES` map at the top of `ImageEditor.jsx`.
 
 ---
 

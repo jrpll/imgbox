@@ -3,43 +3,19 @@ import io
 import os
 import tempfile
 
-from fastapi import FastAPI, Form, HTTPException, UploadFile, File
+from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
-import torch
 from PIL import Image
-from diffusers import StableDiffusion3Pipeline
 
-from finedits import FINEdits
+from model_registry import ModelRegistry
 
-
-# ---------------------------------------------------------------------------
-# Globals — populated during startup
-# ---------------------------------------------------------------------------
-pipe = None
-image_editor = None
-_model_status = "loading"  # "loading" | "ready" | "no_cuda"
-
+registry = ModelRegistry()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global pipe, image_editor, _model_status
-
-    if not torch.cuda.is_available():
-        _model_status = "no_cuda"
-        yield
-        return
-
-    token = os.getenv("HUGGING_FACE_TOKEN")
-    pipe = StableDiffusion3Pipeline.from_pretrained(
-        "stabilityai/stable-diffusion-3-medium-diffusers",
-        torch_dtype=torch.bfloat16,
-        token=token,
-    ).to("cuda")
-    image_editor = FINEdits(pipe)
-    _model_status = "ready"
-
+    #registry.acquire('edit')
     yield
 
 
@@ -58,21 +34,23 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 @app.get("/health")
 async def health():
-    return {"status": _model_status}
+    return {"status": "ready" if registry.current() else "loading"}
 
 
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+@app.post("/mode")
+async def mode(name: str = Form(...)):
+    await run_in_threadpool(registry.acquire, name)
+    return {"current": registry.current()}
+
 @app.post("/generate")
 async def generate(
     image: UploadFile = File(...),
     text1: str = Form(""),
     text2: str = Form(""),
 ):
-    if _model_status != "ready":
-        raise HTTPException(status_code=503, detail=_model_status)
-
     contents = await image.read()
 
     # Save to temp file (keeps a path available if needed by PIL)
@@ -88,6 +66,7 @@ async def generate(
     print(f"generate: text1={text1!r}  text2={text2!r}  neg={neg_prompt!r}")
 
     def _run():
+        image_editor = registry.acquire('edit')
         image_editor.ft_invert(
             img=pil_image,
             prompt=text1,
@@ -111,16 +90,13 @@ async def edit(
     text1: str = Form(""),
     text2: str = Form(""),
 ):
-    if _model_status != "ready":
-        raise HTTPException(status_code=503, detail=_model_status)
-
-    num_inversion_steps = image_editor.num_inversion_steps
-    num_skipped_steps = num_inversion_steps - int(slider * num_inversion_steps)
     neg_prompt = text1.replace(text2, "").strip(", ")
-
-    print(f"edit: slider={slider}  skipped={num_skipped_steps}  neg={neg_prompt!r}")
+    print(f"edit: slider={slider} neg={neg_prompt!r}")
 
     def _run():
+        image_editor = registry.acquire('edit')
+        num_inversion_steps = image_editor.num_inversion_steps
+        num_skipped_steps = num_inversion_steps - int(slider * num_inversion_steps)
         return image_editor.edit(
             prompt=text2,
             neg_prompt=neg_prompt,
@@ -134,6 +110,22 @@ async def edit(
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/jpeg")
 
+@app.post("/remove-background")
+async def remove_background(image: UploadFile = File(...)):
+    contents = await image.read()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(image.filename or "img.jpg")[1])
+    tmp.write(contents)
+    tmp.close()
+    pil_image = Image.open(tmp.name).convert("RGB")
+    def _run():
+        model = registry.acquire('remove-background')
+        return model(pil_image)
+    
+    pil_image = await run_in_threadpool(_run)
+    buf = io.BytesIO()
+    pil_image.save(buf, "png")
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/png")
 
 # ---------------------------------------------------------------------------
 # Entry point

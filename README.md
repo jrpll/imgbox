@@ -1,4 +1,4 @@
-![imgbox logo](client/src/assets/imgbox.jpeg)
+![imgbox logo](frontend/src/assets/imgbox.jpeg)
 
 ## Test app
 
@@ -11,7 +11,8 @@ Open UI
 Launch side car
 
 ```bash
-cd ~/imgbox/server && uv run python app.py
+cd ~/imgbox/server && HUGGING_FACE_TOKEN=hf_yourtoken uv run uvicorn app:app --reload --port 8080
+```
 
 ## Todo
 
@@ -20,4 +21,3 @@ cd ~/imgbox/server && uv run python app.py
 - [ ] PyInstaller — bundle FastAPI server into standalone binary (needed for local mode)
 - [ ] GitHub Actions — build installers (.deb, .AppImage, .exe, .dmg) on release
 - [ ] Code signing — Windows + macOS (requires paid certificates)
-```

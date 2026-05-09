@@ -1,5 +1,33 @@
 # Devlog
 
+## 2026-05-09 — Mode contract simplified, model swap registry, remove-background mode
+
+### Mode contract (frontend)
+- Replaced `forwardRef` + `useImperativeHandle` + `onCanRunChange` plumbing with a config-object contract: each mode under `frontend/src/components/modes/` exports `{ label, initialState, Inputs, submit, canSubmit }`
+- `ImageEditor.jsx` owns `image`, `result`, `isLoading`, `isEditingSlider`, and an opaque `modeState`; derives `canRun = !isLoading && cfg.canSubmit(...)` and wires the shared Run/Reset to `cfg.submit` / `cfg.initialState`
+- No more refs reaching into modes, no more effect-based readiness propagation
+- Mode change clears image, mode state, and result for a fresh slate
+
+### Model swap registry (`server/model_registry.py`)
+- New `ModelRegistry` singleton — holds at most one model on GPU. `acquire(name)` full-unloads the current model (`gc.collect()` + `torch.cuda.empty_cache()`) and loads the new one; same-name calls are a no-op fast path. Thread-safe via a lock.
+- Loaders (`_load_edit`, `_load_remove_background`) hardcoded inside the class; adding a mode is one edit in one file
+- `app.py` boots with `registry.acquire('edit')` in `lifespan`; each handler calls `registry.acquire(...)` inside `_run` (off the event loop)
+
+### Eager mode swap (`POST /mode`)
+- New `/mode` endpoint takes `name` and acquires the corresponding model in the threadpool
+- `handleModeChange` in `ImageEditor.jsx` fires `POST /mode` fire-and-forget on dropdown change, so the model is warm by the time the user clicks Run
+- Lazy fallback preserved: if a swap is in flight when Run fires, the registry's lock serializes the request behind it
+
+### Remove-background mode
+- New `server/background_remover.py`: `BackgroundRemover` wraps RMBG-2.0 with `@torch.no_grad()` inference and aspect-preserving resize (scale longer side to 1024, run inference, mask resize back to original dimensions)
+- New `POST /remove-background` route — thin handler: read upload → PIL → call `BackgroundRemover` via `run_in_threadpool` → PNG response (alpha preserved)
+- `RemoveBackground.jsx` upgraded from stub to full mode: submit posts to `/remove-background`, `canSubmit` returns true once an image is uploaded
+- URL/key naming aligned to hyphens everywhere (`'remove-background'` mode key, `/remove-background` route)
+
+### Docs
+- `CLAUDE.md`: `client/` → `frontend/` everywhere, architecture tree updated, "Mode contract" section added
+- `README.md`: fixed broken image path (`client/src/assets/imgbox.jpeg` → `frontend/...`), closed dangling code fence that was swallowing the Todo list, updated sidecar launch command with `HUGGING_FACE_TOKEN` env var and proper uvicorn invocation
+
 ## 2026-05-09 — Frontend refactor + UI polish (`frontend/`)
 
 ### Drag-and-drop

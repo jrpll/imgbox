@@ -1,18 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { Upload, X, Download, ImageIcon, ChevronDown } from 'lucide-react';
 import boxIconRaw from '../assets/box.svg?raw'
+import { apiPost } from '../lib/api';
 import ThreeSpinner from './ThreeSpinner';
-import Edit from './modes/Edit';
-import RemoveBackground from './modes/RemoveBackground';
+import editMode from './modes/Edit';
+import removeBackgroundMode from './modes/RemoveBackground';
 
 const MODES = {
-  'edit': Edit,
-  'remove-background': RemoveBackground,
-};
-
-const MODE_LABELS = {
-  'edit': 'edit',
-  'remove-background': 'remove background',
+  'edit': editMode,
+  'remove-background': removeBackgroundMode,
 };
 
 export default function ImageEditor() {
@@ -22,11 +18,13 @@ export default function ImageEditor() {
   const [isEditingSlider, setIsEditingSlider] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [mode, setMode] = useState('edit');
+  const [modeState, setModeState] = useState(MODES['edit'].initialState);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [canRun, setCanRun] = useState(false);
   const fileInputRef = useRef(null);
   const menuRef = useRef(null);
-  const modeRef = useRef(null);
+
+  const modeConfig = MODES[mode];
+  const canRun = !isLoading && modeConfig.canSubmit({ image, state: modeState });
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -38,8 +36,31 @@ export default function ImageEditor() {
 
   const handleModeChange = (value) => {
     setMode(value);
+    setModeState(MODES[value].initialState);
     setMenuOpen(false);
-    setCanRun(false);
+    setImage(null);
+    setResult(null);
+
+    const fd = new FormData();
+    fd.append('name', value);
+    apiPost('/mode', fd).catch((err) => console.error('mode swap:', err));
+  };
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    try {
+      const blobUrl = await modeConfig.submit({ image, state: modeState });
+      setResult(blobUrl);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setModeState(modeConfig.initialState);
+    setImage(null);
     setResult(null);
   };
 
@@ -50,7 +71,7 @@ export default function ImageEditor() {
     setIsDragging(false);
   };
 
-  const ModeComponent = MODES[mode];
+  const Inputs = modeConfig.Inputs;
 
   return (
     <div className="h-screen bg-white flex flex-col p-5 gap-3 overflow-hidden">
@@ -65,18 +86,18 @@ export default function ImageEditor() {
             className="flex items-center gap-2 px-4 py-1.5 text-base font-normal leading-none border border-gray-300 rounded hover:bg-gray-50 transition-colors min-w-[180px] justify-between"
             style={{ textBox: 'trim-both cap alphabetic' }}
           >
-            {MODE_LABELS[mode]}
+            {modeConfig.label}
             <ChevronDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
           </button>
           {menuOpen && (
             <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 min-w-[280px] py-1">
-              {Object.entries(MODE_LABELS).map(([value, label]) => (
+              {Object.entries(MODES).map(([value, cfg]) => (
                 <button
                   key={value}
                   onClick={() => handleModeChange(value)}
                   className={`w-full text-left px-4 py-2 text-base font-normal transition-colors ${mode === value ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
                 >
-                  {label}
+                  {cfg.label}
                 </button>
               ))}
             </div>
@@ -138,16 +159,12 @@ export default function ImageEditor() {
 
           {/* Mode-specific inputs */}
           <div className="flex-1 flex flex-col min-h-0">
-            <ModeComponent
-              ref={modeRef}
-              image={image}
+            <Inputs
+              state={modeState}
+              setState={setModeState}
               result={result}
-              isLoading={isLoading}
               onResult={setResult}
-              onLoading={setIsLoading}
               onEditingSlider={setIsEditingSlider}
-              onReset={() => { setImage(null); setResult(null); }}
-              onCanRunChange={setCanRun}
             />
           </div>
 
@@ -155,14 +172,14 @@ export default function ImageEditor() {
           <div className="flex items-center gap-3 px-5 py-4 border-t border-gray-100">
             <button
               type="button"
-              onClick={() => modeRef.current?.reset()}
+              onClick={handleReset}
               className="px-4 py-2 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
             >
               Reset
             </button>
             <button
               type="button"
-              onClick={() => modeRef.current?.submit()}
+              onClick={handleSubmit}
               disabled={!canRun}
               className="flex-1 py-2 text-sm font-medium rounded bg-[#0ea0ff] hover:bg-blue-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
