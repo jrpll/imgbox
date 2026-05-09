@@ -1,4 +1,4 @@
-![imgbox logo](frontend/src/assets/imgbox.jpeg)
+![imgbox logo](frontend/src/assets/imgbox_2.png)
 
 ## Test app
 
