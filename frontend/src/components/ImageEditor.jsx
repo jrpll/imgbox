@@ -1,0 +1,222 @@
+import { useState, useEffect, useRef } from 'react';
+import { Upload, X, Download, ImageIcon, ChevronDown } from 'lucide-react';
+import boxIconRaw from '../assets/box.svg?raw'
+import ThreeSpinner from './ThreeSpinner';
+import Edit from './modes/Edit';
+import RemoveBackground from './modes/RemoveBackground';
+
+const MODES = {
+  'edit': Edit,
+  'remove-background': RemoveBackground,
+};
+
+const MODE_LABELS = {
+  'edit': 'edit',
+  'remove-background': 'remove background',
+};
+
+export default function ImageEditor() {
+  const [image, setImage] = useState(null);
+  const [result, setResult] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isEditingSlider, setIsEditingSlider] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [mode, setMode] = useState('edit');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [canRun, setCanRun] = useState(false);
+  const fileInputRef = useRef(null);
+  const menuRef = useRef(null);
+  const modeRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleModeChange = (value) => {
+    setMode(value);
+    setMenuOpen(false);
+    setCanRun(false);
+    setResult(null);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) setImage(file);
+    setIsDragging(false);
+  };
+
+  const ModeComponent = MODES[mode];
+
+  return (
+    <div className="h-screen bg-white flex flex-col p-5 gap-3 overflow-hidden">
+
+      {/* Header */}
+      <div className="flex items-baseline gap-2 flex-shrink-0">
+        <h1 className="text-2xl font-bold">imgbox</h1>
+        <span className="w-6 h-6 block self-center" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="24" height="24"') }} />
+        <div className="relative ml-2" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            className="flex items-center gap-2 px-4 py-1.5 text-base font-normal leading-none border border-gray-300 rounded hover:bg-gray-50 transition-colors min-w-[180px] justify-between"
+            style={{ textBox: 'trim-both cap alphabetic' }}
+          >
+            {MODE_LABELS[mode]}
+            <ChevronDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {menuOpen && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 min-w-[280px] py-1">
+              {Object.entries(MODE_LABELS).map(([value, label]) => (
+                <button
+                  key={value}
+                  onClick={() => handleModeChange(value)}
+                  className={`w-full text-left px-4 py-2 text-base font-normal transition-colors ${mode === value ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main row — two cards */}
+      <div className="flex gap-4 flex-1 min-h-0">
+
+        {/* Input card */}
+        <div className="flex-1 flex flex-col rounded border border-gray-200 overflow-hidden">
+          <div className="px-5 pt-4 pb-3 border-b border-gray-100">
+            <span className="font-semibold">Input</span>
+          </div>
+
+          {/* Image upload — shared across all modes */}
+          <div className="px-5 pt-4 flex-shrink-0">
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragEnter={() => setIsDragging(true)}
+              onDragLeave={() => setIsDragging(false)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={handleDrop}
+              className={`relative h-40 flex items-center justify-center border-2 rounded cursor-pointer overflow-hidden transition-colors ${
+                isDragging
+                  ? 'border-blue-400 bg-blue-50'
+                  : image
+                    ? 'border-gray-200'
+                    : 'border-dashed border-gray-300 hover:border-gray-400 bg-gray-50'
+              }`}
+            >
+              {image ? (
+                <>
+                  <img src={URL.createObjectURL(image)} alt="Preview" className="max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] object-contain rounded" />
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setImage(null); setResult(null); }}
+                    className="absolute top-2 right-2 p-0.5 bg-gray-400 text-white rounded-full hover:bg-gray-500"
+                  >
+                    <X size={12} />
+                  </button>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-2 text-gray-400">
+                  <Upload size={24} />
+                  <span className="text-sm">Click or drag an image</span>
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept="image/*"
+              onChange={(e) => { const f = e.target.files[0]; if (f) setImage(f); }}
+            />
+          </div>
+
+          {/* Mode-specific inputs */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <ModeComponent
+              ref={modeRef}
+              image={image}
+              result={result}
+              isLoading={isLoading}
+              onResult={setResult}
+              onLoading={setIsLoading}
+              onEditingSlider={setIsEditingSlider}
+              onReset={() => { setImage(null); setResult(null); }}
+              onCanRunChange={setCanRun}
+            />
+          </div>
+
+          {/* Shared action buttons */}
+          <div className="flex items-center gap-3 px-5 py-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => modeRef.current?.reset()}
+              className="px-4 py-2 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              onClick={() => modeRef.current?.submit()}
+              disabled={!canRun}
+              className="flex-1 py-2 text-sm font-medium rounded bg-[#0ea0ff] hover:bg-blue-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoading ? 'Processing...' : 'Run'}
+            </button>
+          </div>
+        </div>
+
+        {/* Result card */}
+        <div className="flex-1 flex flex-col rounded border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100">
+            <span className="font-semibold">Result</span>
+            {result && (
+              <button
+                type="button"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = result;
+                  link.download = 'generated-image.png';
+                  link.click();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <Download size={13} />
+                Download
+              </button>
+            )}
+          </div>
+
+          <div className="flex-1 flex items-center justify-center p-4 bg-gray-50">
+            {isLoading ? (
+              <div className="flex items-center gap-3 text-gray-400">
+                <ThreeSpinner size={32} />
+                <span className="text-sm">Processing...</span>
+              </div>
+            ) : result ? (
+              <div className="relative w-full h-full">
+                {isEditingSlider && (
+                  <div className="absolute inset-0 bg-black/25 flex items-center justify-center z-10 rounded">
+                    <span className="text-white text-sm">Updating...</span>
+                  </div>
+                )}
+                <img src={result} alt="Generated" className="w-full h-full object-contain rounded" />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 text-gray-300">
+                <ImageIcon size={40} />
+                <span className="text-sm">Result will appear here</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
+}

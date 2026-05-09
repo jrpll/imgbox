@@ -1,5 +1,23 @@
 # Devlog
 
+## 2026-05-09 — Frontend refactor + UI polish (`frontend/`)
+
+### Drag-and-drop
+- Replaced the Tauri-specific `tauri://drag-drop` listener (needed only for WebKitGTK on Linux) with standard HTML `onDrop` — the app is not using Tauri on Linux, so native browser drag-and-drop is sufficient.
+
+### Mode selector
+- Added a dropdown menu next to the app name to switch between modes ("edit", "remove background")
+- Mode state lives in `ImageEditor.jsx`; switching resets result and canRun
+
+### Component refactor
+- `ImageEditor.jsx` is now a persistent shell: header, image upload zone, result card, shared Reset/Run buttons, and mode state
+- Mode-specific input components extracted to `src/components/modes/Edit.jsx` and `modes/RemoveBackground.jsx`
+- Mode components expose `submit` and `reset` imperatively via `forwardRef` + `useImperativeHandle`, and signal readiness via an `onCanRunChange` callback — keeps the buttons in the shell without lifting mode-specific state up
+
+### Styles
+- Deleted unused `App.css` (Vite boilerplate)
+- Added `.input-textarea` and `.input-clear-btn` component classes to `index.css` via Tailwind `@apply` — single place to change shared input styles across all mode files
+
 ## 2026-04-20 — UI redesign: two-panel card layout
 
 ### Layout (`client/src/components/ImageEditor.jsx`, `client/src/App.jsx`)

@@ -28,3 +28,13 @@ body {
 button {
   font-family: inherit;
 }
+
+@layer components {
+  .input-textarea {
+    @apply w-full px-3 py-2 border border-gray-300 text-gray-900 rounded text-sm focus:outline-none focus:border-gray-400 resize-none placeholder-gray-400;
+  }
+
+  .input-clear-btn {
+    @apply absolute top-2 right-2 p-0.5 bg-gray-400 text-white rounded-full hover:bg-gray-500;
+  }
+}
