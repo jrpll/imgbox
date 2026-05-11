@@ -126,11 +126,11 @@ export default function ImageEditor() {
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
               className={`relative h-40 flex items-center justify-center rounded cursor-pointer overflow-hidden transition-colors ${
-                isDragging ? 'bg-blue-50' : image ? '' : 'bg-gray-50'
+                isDragging ? 'bg-gray-100' : image ? '' : 'bg-gray-50'
               }`}
               style={{
                 backgroundImage: isDragging
-                  ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%2360a5fa' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
+                  ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%239ca3af' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
                   : image
                     ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%23e5e7eb' stroke-width='2' stroke-dasharray='0' stroke-linecap='square'/%3e%3c/svg%3e")`
                     : isHovered
