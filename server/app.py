@@ -30,6 +30,30 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+_CONFIG_FILE = os.path.join(os.path.dirname(__file__), ".env")
+
+def _load_env_file():
+    if os.path.exists(_CONFIG_FILE):
+        with open(_CONFIG_FILE) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, _, v = line.partition("=")
+                    os.environ.setdefault(k.strip(), v.strip())
+
+_load_env_file()
+
+@app.post("/config")
+async def set_config(hf_token: str = Form(...)):
+    os.environ["HUGGING_FACE_TOKEN"] = hf_token
+    with open(_CONFIG_FILE, "w") as f:
+        f.write(f"HUGGING_FACE_TOKEN={hf_token}\n")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
 @app.get("/health")

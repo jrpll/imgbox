@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, X, Download, Image, CaretDown } from '@phosphor-icons/react';
+import { Upload, X, Download, Image, CaretDown, SidebarSimple } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
 import { apiPost } from '../lib/api';
 import ThreeSpinner from './ThreeSpinner';
@@ -21,6 +21,12 @@ export default function ImageEditor() {
   const [mode, setMode] = useState('edit');
   const [modeState, setModeState] = useState(MODES['edit'].initialState);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [hfExpanded, setHfExpanded] = useState(false);
+  const [hfToken, setHfToken] = useState('');
+  const [hfSaved, setHfSaved] = useState(false);
+  const [langExpanded, setLangExpanded] = useState(false);
+  const [lang, setLang] = useState('ENG');
   const fileInputRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -75,10 +81,10 @@ export default function ImageEditor() {
   const Inputs = modeConfig.Inputs;
 
   return (
-    <div className="h-screen bg-white flex flex-col p-5 gap-3 overflow-hidden">
+    <div className="relative h-screen bg-white flex flex-col p-5 gap-3 overflow-hidden">
 
       {/* Header */}
-      <div className="flex items-baseline gap-2 flex-shrink-0 pl-2">
+      <div className="flex items-baseline gap-2 flex-shrink-0 pl-2 w-full">
         <h1 className="text-2xl font-bold">imgbox</h1>
         <span className="w-6 h-6 block self-center" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="24" height="24"') }} />
         <div className="relative ml-2" ref={menuRef}>
@@ -101,6 +107,63 @@ export default function ImageEditor() {
                   {cfg.label}
                 </button>
               ))}
+            </div>
+          )}
+        </div>
+        <div className="ml-auto self-center" onMouseEnter={() => setSettingsOpen(true)} onMouseLeave={() => setSettingsOpen(false)}>
+          <button className="p-1.5 text-black hover:text-gray-500 transition-colors">
+            <SidebarSimple size={20} mirrored />
+          </button>
+          {settingsOpen && (
+            <div className="absolute top-0 right-0 h-full w-96 bg-white border-l border-gray-200 shadow-lg flex flex-col z-50">
+              <div className="px-5 pt-5 pb-3 border-b border-gray-100 font-semibold">Settings</div>
+              <div className="flex flex-col py-2">
+                <button
+                  onClick={() => { setHfExpanded(o => !o); setHfSaved(false); }}
+                  className="text-left px-5 py-3 text-sm hover:bg-gray-50 transition-colors"
+                >
+                  HF token
+                </button>
+                {hfExpanded && (
+                  <div className="px-5 pb-3">
+                    <input
+                      autoFocus
+                      type="password"
+                      value={hfToken}
+                      onChange={e => { setHfToken(e.target.value); setHfSaved(false); }}
+                      onKeyDown={async e => {
+                        if (e.key !== 'Enter' || !hfToken.trim()) return;
+                        const fd = new FormData();
+                        fd.append('hf_token', hfToken.trim());
+                        await apiPost('/config', fd);
+                        setHfSaved(true);
+                      }}
+                      placeholder="hf_..."
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-400"
+                    />
+                    {hfSaved && <span className="text-xs text-green-500 mt-1 block">Saved</span>}
+                  </div>
+                )}
+                <button
+                  onClick={() => setLangExpanded(o => !o)}
+                  className="text-left px-5 py-3 text-sm hover:bg-gray-50 transition-colors"
+                >
+                  Language
+                </button>
+                {langExpanded && (
+                  <div className="flex flex-col">
+                    {['FR', 'ENG', 'ESP'].map(l => (
+                      <button
+                        key={l}
+                        onClick={() => { setLang(l); setLangExpanded(false); }}
+                        className={`text-left px-8 py-2 text-sm transition-colors ${lang === l ? 'text-black font-medium' : 'text-gray-500 hover:bg-gray-50'}`}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -240,6 +303,7 @@ export default function ImageEditor() {
         </div>
       </div>
 
+      {/* Settings panel */}
     </div>
   );
 }
