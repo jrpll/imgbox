@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, X, Download, ImageIcon, ChevronDown } from 'lucide-react';
+import { Upload, X, Download, Image, CaretDown } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
 import { apiPost } from '../lib/api';
 import ThreeSpinner from './ThreeSpinner';
@@ -17,6 +17,7 @@ export default function ImageEditor() {
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingSlider, setIsEditingSlider] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [mode, setMode] = useState('edit');
   const [modeState, setModeState] = useState(MODES['edit'].initialState);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -87,7 +88,7 @@ export default function ImageEditor() {
             style={{ textBox: 'trim-both cap alphabetic' }}
           >
             {modeConfig.label}
-            <ChevronDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+            <CaretDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
           </button>
           {menuOpen && (
             <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 min-w-[280px] py-1">
@@ -118,17 +119,24 @@ export default function ImageEditor() {
           <div className="px-5 pt-4 flex-shrink-0">
             <div
               onClick={() => fileInputRef.current?.click()}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
               onDragEnter={() => setIsDragging(true)}
               onDragLeave={() => setIsDragging(false)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
-              className={`relative h-40 flex items-center justify-center border-2 rounded cursor-pointer overflow-hidden transition-colors ${
-                isDragging
-                  ? 'border-blue-400 bg-blue-50'
-                  : image
-                    ? 'border-gray-200'
-                    : 'border-dashed border-gray-300 hover:border-gray-400 bg-gray-50'
+              className={`relative h-40 flex items-center justify-center rounded cursor-pointer overflow-hidden transition-colors ${
+                isDragging ? 'bg-blue-50' : image ? '' : 'bg-gray-50'
               }`}
+              style={{
+                backgroundImage: isDragging
+                  ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%2360a5fa' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
+                  : image
+                    ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%23e5e7eb' stroke-width='2' stroke-dasharray='0' stroke-linecap='square'/%3e%3c/svg%3e")`
+                    : isHovered
+                      ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%239ca3af' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
+                      : `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%23d1d5db' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
+              }}
             >
               {image ? (
                 <>
@@ -144,7 +152,6 @@ export default function ImageEditor() {
               ) : (
                 <div className="flex flex-col items-center gap-2 text-gray-400">
                   <Upload size={24} />
-                  <span className="text-sm">Click or drag an image</span>
                 </div>
               )}
             </div>
@@ -226,8 +233,7 @@ export default function ImageEditor() {
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 text-gray-300">
-                <ImageIcon size={40} />
-                <span className="text-sm">Result will appear here</span>
+                <Image size={40} />
               </div>
             )}
           </div>

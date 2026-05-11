@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-05-11 — UI polish
+
+- Removed helper text from image drop zone ("Click or drag an image") and result panel ("Result will appear here") — icons are self-explanatory
+- Migrated all icons from `lucide-react` to `@phosphor-icons/react` for visual consistency; replaced `ImageIcon` with Phosphor's `Image`, `ChevronDown` with `CaretDown`
+- Textareas now highlight border on hover (`hover:border-gray-400`), matching the drop zone behavior
+- Drop zone dashes shortened via SVG `backgroundImage` trick (`stroke-dasharray='6 5'`), since Tailwind has no dash-length control; hover border darkening re-implemented with React `isHovered` state
+
 ## 2026-05-09 — Mode contract simplified, model swap registry, remove-background mode
 
 ### Mode contract (frontend)
