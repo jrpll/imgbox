@@ -47,7 +47,6 @@ class ModelRegistry:
             torch_dtype=torch.bfloat16,
             token=TOKEN
         )
-        pipe.enable_model_cpu_offload()
         image_editor = FINEdits(pipe)
         return image_editor
 

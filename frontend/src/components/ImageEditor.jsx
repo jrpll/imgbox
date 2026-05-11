@@ -47,10 +47,6 @@ export default function ImageEditor() {
     setMenuOpen(false);
     setImage(null);
     setResult(null);
-
-    const fd = new FormData();
-    fd.append('name', value);
-    apiPost('/mode', fd).catch((err) => console.error('mode swap:', err));
   };
 
   const handleSubmit = async () => {

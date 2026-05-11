@@ -15,7 +15,6 @@ registry = ModelRegistry()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    #registry.acquire('edit')
     yield
 
 
@@ -64,11 +63,6 @@ async def health():
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
-@app.post("/mode")
-async def mode(name: str = Form(...)):
-    await run_in_threadpool(registry.acquire, name)
-    return {"current": registry.current()}
-
 @app.post("/generate")
 async def generate(
     image: UploadFile = File(...),
