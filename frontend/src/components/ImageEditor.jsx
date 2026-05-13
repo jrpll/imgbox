@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, X, Download, Image, CaretDown, SidebarSimple } from '@phosphor-icons/react';
+import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
 import { apiPost } from '../lib/api';
 import ThreeSpinner from './ThreeSpinner';
@@ -52,7 +52,7 @@ export default function ImageEditor() {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const blobUrl = await modeConfig.submit({ image, state: modeState });
+      const blobUrl = await modeConfig.submit({ image, state: modeState, setState: setModeState });
       setResult(blobUrl);
     } catch (err) {
       console.error('Error:', err);
@@ -170,16 +170,45 @@ export default function ImageEditor() {
 
         {/* Input card */}
         <div className="flex-1 flex flex-col rounded border border-gray-200 overflow-hidden">
-          <div className="px-5 pt-4 pb-3 border-b border-gray-100">
-            <span className="font-semibold">Input</span>
+          <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
+            <span className="font-semibold">
+              Input
+              {modeConfig.getStepLabel && (
+                <span className="text-gray-400 font-normal"> · {modeConfig.getStepLabel(modeState)}</span>
+              )}
+            </span>
+            {modeConfig.totalSteps && (
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setModeState((s) => ({ ...s, step: s.step - 1 }))}
+                  disabled={modeState.step === 1}
+                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ArrowLeft size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModeState((s) => ({ ...s, step: s.step + 1 }))}
+                  disabled={modeState.step === modeConfig.totalSteps}
+                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ArrowRight size={15} />
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Image upload — shared across all modes */}
-          <div className="px-5 pt-4 flex-shrink-0">
+          {/* Image upload — hidden in step 2+ of multi-step modes */}
+          <div className={`px-5 pt-4 flex-shrink-0 ${modeConfig.totalSteps && modeState.step > 1 ? 'hidden' : ''}`}>
             <div
-              onClick={() => fileInputRef.current?.click()}
+              className="group flex flex-col gap-1"
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
+            >
+            <span className="text-xs text-gray-400 group-hover:text-gray-600">Image</span>
+            <div
+              onClick={() => fileInputRef.current?.click()}
               onDragEnter={() => setIsDragging(true)}
               onDragLeave={() => setIsDragging(false)}
               onDragOver={(e) => e.preventDefault()}
@@ -190,10 +219,10 @@ export default function ImageEditor() {
               style={{
                 backgroundImage: isDragging
                   ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%239ca3af' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
-                  : image
-                    ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%23e5e7eb' stroke-width='2' stroke-dasharray='0' stroke-linecap='square'/%3e%3c/svg%3e")`
-                    : isHovered
-                      ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%239ca3af' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
+                  : isHovered
+                    ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%239ca3af' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
+                    : image
+                      ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%23e5e7eb' stroke-width='2' stroke-dasharray='0' stroke-linecap='square'/%3e%3c/svg%3e")`
                       : `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%23d1d5db' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
               }}
             >
@@ -221,6 +250,7 @@ export default function ImageEditor() {
               accept="image/*"
               onChange={(e) => { const f = e.target.files[0]; if (f) setImage(f); }}
             />
+            </div>
           </div>
 
           {/* Mode-specific inputs */}
@@ -267,10 +297,9 @@ export default function ImageEditor() {
                   link.download = 'generated-image.png';
                   link.click();
                 }}
-                className="flex items-center gap-1.5 px-3 py-1 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
+                className="flex items-center px-2 py-1 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 <Download size={13} />
-                Download
               </button>
             )}
           </div>

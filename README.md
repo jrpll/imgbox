@@ -1,23 +1,31 @@
 ![imgbox logo](frontend/src/assets/imgbox_2.png)
 
-## Test app
+## Testing
 
-Open UI
+Start backend
 
 ```bash
-~/imgbox/src-tauri/target/debug/app
+cd server && uv run uvicorn app:app --reload --port 8080
 ```
 
-Launch side car
+Start the UI
 
 ```bash
-cd ~/imgbox/server && HUGGING_FACE_TOKEN=hf_yourtoken uv run uvicorn app:app --reload --port 8080
+cd frontend && npm run dev
 ```
 
 ## Todo
 
-- [ ] Settings UI — HuggingFace token input, local/remote mode switch
-- [ ] Model loading screen — poll `/health` on startup, show progress
-- [ ] PyInstaller — bundle FastAPI server into standalone binary (needed for local mode)
-- [ ] GitHub Actions — build installers (.deb, .AppImage, .exe, .dmg) on release
-- [ ] Code signing — Windows + macOS (requires paid certificates)
+- [ ] Add cache (mémoire des derniers edits faits pour recharger à l'ouverture)
+- [ ] Ajouter clear cache option dans le panel de droite
+- [ ] Renommer les items dans le drop down "edit" -> "sd3 + gommette edit", ainsi que les routes
+- [ ] Indication du progrès directement sur le bouton, utiliser Queue truc cf conv précédentes
+- [ ] Mettre des pastilles i à côté des champs pour donner des indications
+
+## Valider les changements
+
+```bash
+git add .
+git commit -m ""
+git push origin main
+```

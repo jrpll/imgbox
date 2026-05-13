@@ -68,10 +68,11 @@ async def generate(
     image: UploadFile = File(...),
     text1: str = Form(""),
     text2: str = Form(""),
+    num_train_steps: int = Form(100),
+    num_inversion_steps: int = Form(50),
 ):
     contents = await image.read()
 
-    # Save to temp file (keeps a path available if needed by PIL)
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(image.filename or "img.jpg")[1])
     tmp.write(contents)
     tmp.close()
@@ -81,16 +82,16 @@ async def generate(
 
     neg_prompt = text1.replace(text2, "").strip(", ")
 
-    print(f"generate: text1={text1!r}  text2={text2!r}  neg={neg_prompt!r}")
+    print(f"generate: text1={text1!r}  text2={text2!r}  neg={neg_prompt!r}  train_steps={num_train_steps}  inv_steps={num_inversion_steps}")
 
     def _run():
         image_editor = registry.acquire('edit')
         image_editor.ft_invert(
             img=pil_image,
             prompt=text1,
-            num_train_steps=100,
+            num_train_steps=num_train_steps,
             fine_tune=True,
-            num_inversion_steps=50,
+            num_inversion_steps=num_inversion_steps,
         )
         return image_editor.edit(prompt=text2, neg_prompt=neg_prompt)
 
@@ -107,8 +108,10 @@ async def edit(
     slider: float = Form(0.9),
     text1: str = Form(""),
     text2: str = Form(""),
+    neg_prompt: str = Form(""),
 ):
-    neg_prompt = text1.replace(text2, "").strip(", ")
+    if not neg_prompt:
+        neg_prompt = text1.replace(text2, "").strip(", ")
     print(f"edit: slider={slider} neg={neg_prompt!r}")
 
     def _run():

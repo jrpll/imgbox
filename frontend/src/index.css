@@ -29,9 +29,21 @@ button {
   font-family: inherit;
 }
 
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+
+
 @layer components {
   .input-textarea {
-    @apply w-full px-3 py-2 border border-gray-300 text-gray-900 rounded text-sm focus:outline-none focus:border-gray-400 hover:border-gray-400 resize-none placeholder-gray-400;
+    @apply w-full px-3 py-2 border border-gray-300 text-gray-900 rounded text-sm focus:outline-none focus:border-gray-400 hover:border-gray-400 group-hover:border-gray-400 resize-none placeholder-gray-400 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-gray-300;
   }
 
   .input-clear-btn {
