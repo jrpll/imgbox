@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
 import { apiPost, apiEventSource } from '../lib/api';
+import { loadState, saveState, clearState } from '../lib/persist';
 import ThreeSpinner from './ThreeSpinner';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
@@ -71,19 +72,38 @@ export default function ImageEditor() {
     };
   }, [isLoading]);
 
-  const handleModeChange = (value) => {
-    setMode(value);
-    setModeState(MODES[value].initialState);
-    setMenuOpen(false);
+  useEffect(() => {
+    setModeState(MODES[mode].initialState);
     setImage(null);
     setResult(null);
+    let cancelled = false;
+    (async () => {
+      const saved = await loadState(mode);
+      if (cancelled || !saved) return;
+      const cfg = MODES[mode];
+      setModeState(cfg.restoreState ? cfg.restoreState(saved.modeState) : saved.modeState);
+      if (saved.image) setImage(saved.image);
+      if (saved.result) setResult(URL.createObjectURL(saved.result));
+    })();
+    return () => { cancelled = true; };
+  }, [mode]);
+
+  useEffect(() => {
+    return () => { if (result) URL.revokeObjectURL(result); };
+  }, [result]);
+
+  const handleModeChange = (value) => {
+    setMode(value);
+    setMenuOpen(false);
   };
 
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const blobUrl = await modeConfig.submit({ image, state: modeState, setState: setModeState });
-      setResult(blobUrl);
+      const { blob, state: newState } = await modeConfig.submit({ image, state: modeState });
+      setModeState(newState);
+      setResult(URL.createObjectURL(blob));
+      await saveState(mode, { modeState: newState, image, result: blob });
     } catch (err) {
       console.error('Error:', err);
     } finally {
@@ -91,10 +111,11 @@ export default function ImageEditor() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     setModeState(modeConfig.initialState);
     setImage(null);
     setResult(null);
+    await clearState(mode);
   };
 
   const handleDrop = (e) => {

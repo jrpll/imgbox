@@ -137,7 +137,7 @@ function Inputs({ state, setState }) {
   );
 }
 
-async function submit({ image, state, setState }) {
+async function submit({ image, state }) {
   if (state.step === 1) {
     const fd = new FormData();
     fd.append('image', image);
@@ -146,9 +146,7 @@ async function submit({ image, state, setState }) {
     fd.append('num_train_steps', state.numTrainSteps);
     fd.append('num_inversion_steps', state.numInversionSteps);
     const r = await apiPost('/generate', fd);
-    const url = URL.createObjectURL(await r.blob());
-    setState((s) => ({ ...s, trained: true, step: 2 }));
-    return url;
+    return { blob: await r.blob(), state: { ...state, trained: true, step: 2 } };
   } else {
     const fd = new FormData();
     fd.append('slider', state.slider);
@@ -156,7 +154,7 @@ async function submit({ image, state, setState }) {
     fd.append('text2', state.text2);
     if (state.negPrompt) fd.append('neg_prompt', state.negPrompt);
     const r = await apiPost('/edit', fd);
-    return URL.createObjectURL(await r.blob());
+    return { blob: await r.blob(), state };
   }
 }
 
@@ -173,4 +171,5 @@ export default {
   canSubmit,
   totalSteps: 2,
   getStepLabel: (state) => state.step === 1 ? 'Training' : 'Edit',
+  restoreState: (state) => ({ ...state, step: 1, trained: false }),
 };

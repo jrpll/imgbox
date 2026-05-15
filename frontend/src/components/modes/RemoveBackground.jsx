@@ -1,10 +1,10 @@
 import { apiPost } from '../../lib/api';
 
-async function submit({ image }) {
+async function submit({ image, state }) {
   const fd = new FormData();
   fd.append('image', image);
   const r = await apiPost('/remove-background', fd);
-  return URL.createObjectURL(await r.blob());
+  return { blob: await r.blob(), state };
 }
 
 export default {

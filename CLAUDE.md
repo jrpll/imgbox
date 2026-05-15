@@ -68,12 +68,15 @@ Each file under `components/modes/` exports a config object:
   label: string,                      // shown in the mode dropdown
   initialState: object,               // mode's input state (e.g. { text1, text2, slider })
   Inputs: ({ state, setState, result, onResult, onEditingSlider }) => JSX,
-  submit: async ({ image, state }) => string,   // returns a result blob URL
+  submit: async ({ image, state }) => ({ blob, state }),   // result image bytes + new mode state
   canSubmit: ({ image, state }) => boolean,
+  restoreState?: (state) => state,    // optional: massage persisted state on rehydrate
 }
 ```
 
 `ImageEditor.jsx` owns `image`, `result`, `isLoading`, `isEditingSlider`, and `modeState` (opaque per-mode). It renders the mode's `Inputs`, computes `canRun = !isLoading && cfg.canSubmit(...)`, and wires the shared Run/Reset buttons to `cfg.submit` and `cfg.initialState`. Modes do not call refs and do not plumb readiness up via callbacks — derive from state.
+
+Per-mode last state (`modeState`, image blob, result blob) is persisted to IndexedDB (`lib/persist.js`, db `imgbox` / store `modes`) on every successful submit and rehydrated when the mode is opened. If rehydration needs adjusting — e.g. resetting multi-step progress because the server's in-memory model state doesn't survive restarts — the mode exports `restoreState`. The `edit` mode uses this to snap back to step 1 with `trained: false`, since the slider depends on the fine-tuned transformer + `zts_ref` that live only in server RAM.
 
 To add a mode: drop a new file under `components/modes/`, register it in the `MODES` map at the top of `ImageEditor.jsx`.
 

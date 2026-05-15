@@ -19,7 +19,6 @@ cd frontend && npm run dev
 - [ ] Add cache (mémoire des derniers edits faits pour recharger à l'ouverture)
 - [ ] Ajouter clear cache option dans le panel de droite
 - [ ] Renommer les items dans le drop down "edit" -> "sd3 + gommette edit", ainsi que les routes
-- [ ] Indication du progrès directement sur le bouton, utiliser Queue truc cf conv précédentes
 - [ ] Mettre des pastilles i à côté des champs pour donner des indications
 
 ## Valider les changements
