@@ -5,6 +5,7 @@ import { apiPost, apiEventSource } from '../lib/api';
 import { loadState, saveState, clearState } from '../lib/persist';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
+import { DotmSquare4 } from './dotmatrix/dotm-square-4';
 
 const MODES = {
   'edit': editMode,
@@ -320,7 +321,7 @@ export default function ImageEditor() {
             <button
               type="button"
               onClick={handleReset}
-              className="px-4 py-2 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
+              className="px-4 h-9 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
             >
               Reset
             </button>
@@ -328,7 +329,7 @@ export default function ImageEditor() {
               type="button"
               onClick={handleSubmit}
               disabled={!canRun}
-              className={`relative overflow-hidden flex-1 py-2 text-sm font-medium rounded text-white transition-colors ${
+              className={`relative overflow-hidden flex-1 h-9 text-sm font-medium rounded text-white transition-colors ${
                 isLoading
                   ? 'bg-[#bce4ff] cursor-wait'
                   : 'bg-[#0ea0ff] hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed'
@@ -340,7 +341,10 @@ export default function ImageEditor() {
                   style={{ width: `${(progress * 100).toFixed(1)}%`, transition: 'width 200ms ease-out' }}
                 />
               )}
-              <span className="relative">{isLoading ? (progressMessage || 'Loading') : 'Run'}</span>
+              <span className="relative flex h-full items-center justify-center gap-2">
+                {isLoading && <DotmSquare4 size={16} dotSize={2} />}
+                {isLoading ? (progressMessage || 'Loading') : 'Run'}
+              </span>
             </button>
           </div>
         </div>

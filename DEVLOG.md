@@ -1,5 +1,22 @@
 # Devlog
 
+## 2026-05-15 — Run-button spinner, drop redundant "Processing…"
+
+### Result viewer
+- Removed the inline `ThreeSpinner` + "Processing…" indicator from the result pane in `ImageEditor.jsx`; the Run button's own progress animation already conveys that work is in flight
+- Dropped the now-unused `ThreeSpinner` import (file kept on disk for now)
+- `handleSubmit` now clears `result` before kicking off the run, so the pane reverts to the empty placeholder instead of showing the previous output during a new run
+
+### Run-button spinner (`frontend/src/components/dotmatrix/`)
+- Added Dot Matrix's `DotmSquare4` ("Twin Orbit") spinner inside the Run button while `isLoading`
+- Skipped `shadcn init` to keep the project JS-only: fetched the four registry files (`dotm-square-4.tsx`, `dotmatrix-core.tsx`, `dotmatrix-hooks.ts`, `dotmatrix-loader.css`) from `dotmatrix.zzzzshawn.cloud/r/dotm-square-4.json` and dropped them into a self-contained `components/dotmatrix/` folder
+- Rewrote `@/components/ui/...` aliases to relative paths within the folder; CSS is side-effect-imported by both `dotm-square-4.tsx` and `dotmatrix-core.tsx` so consumers only need the one named import
+- Added `dotmatrix.d.ts` (just `declare module "*.css";`) to silence the TS-server red squiggle on the CSS import — the project has no `tsconfig.json`, so this local declaration keeps the noise out of the rest of the tree
+
+### Button height stability
+- Both Reset and Run buttons pinned to `h-9` (replacing `py-2`) so the Run button no longer grows when the spinner appears
+- Inner span on Run is now `flex h-full items-center justify-center gap-2`; spinner sized to `size={16} dotSize={2}` to sit on the text baseline
+
 ## 2026-05-11 — UI polish
 
 - Removed helper text from image drop zone ("Click or drag an image") and result panel ("Result will appear here") — icons are self-explanatory
