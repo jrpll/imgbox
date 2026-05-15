@@ -5,6 +5,7 @@ import torch
 import os
 from diffusers import StableDiffusion3Pipeline
 from transformers import AutoModelForImageSegmentation
+from flux2klein_vp import Flux2KleinVPSDEPipeline
 
 from finedits import FINEdits
 from background_remover import BackgroundRemover
@@ -16,6 +17,7 @@ class ModelRegistry:
         self._loaders = {
             'edit': self._load_edit,
             'remove-background': self._load_remove_background,
+            'flux2klein': self._load_flux2klein
         }
         self._current_name: str | None = None
         self._current_model: Any | None = None
@@ -49,7 +51,15 @@ class ModelRegistry:
         )
         image_editor = FINEdits(pipe)
         return image_editor
-
+    
+    def _load_flux2klein(self):
+        pipe = Flux2KleinVPSDEPipeline.from_pretrained(
+            "black-forest-labs/FLUX.2-klein-base-4B", 
+            torch_dtype=torch.bfloat16,
+            token=TOKEN
+        ).to("cuda")
+        return pipe
+    
     def _load_remove_background(self):
         model = AutoModelForImageSegmentation.from_pretrained(
             'briaai/RMBG-2.0', 

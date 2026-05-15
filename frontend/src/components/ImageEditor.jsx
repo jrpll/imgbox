@@ -5,11 +5,13 @@ import { apiPost, apiEventSource } from '../lib/api';
 import { loadState, saveState, clearState } from '../lib/persist';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
+import flux2KleinMode from './modes/Flux2Klein';
 import { DotmSquare4 } from './dotmatrix/dotm-square-4';
 
 const MODES = {
   'edit': editMode,
   'remove-background': removeBackgroundMode,
+  'flux2klein': flux2KleinMode,
 };
 
 export default function ImageEditor() {
@@ -280,7 +282,7 @@ export default function ImageEditor() {
             >
               {image ? (
                 <>
-                  <img src={URL.createObjectURL(image)} alt="Preview" className="max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] object-contain rounded" />
+                  <img src={URL.createObjectURL(image)} alt="Error loading image" className="max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] object-contain rounded" />
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setImage(null); setResult(null); }}

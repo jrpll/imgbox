@@ -16,7 +16,6 @@ cd frontend && npm run dev
 
 ## Todo
 
-- [ ] Add cache (mémoire des derniers edits faits pour recharger à l'ouverture)
 - [ ] Ajouter clear cache option dans le panel de droite
 - [ ] Renommer les items dans le drop down "edit" -> "sd3 + gommette edit", ainsi que les routes
 - [ ] Mettre des pastilles i à côté des champs pour donner des indications

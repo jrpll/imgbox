@@ -168,6 +168,47 @@ async def edit(
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/jpeg")
 
+@app.post("/flux2klein")
+async def flux2klein(
+    image: UploadFile = File(...),
+    prompt: str = Form(""),
+    num_inference_steps: int = Form(100),
+    diffusion_coefficient: float = Form(3),
+):
+    contents = await image.read()
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(image.filename or "img.jpg")[1])
+    tmp.write(contents)
+    tmp.close()
+    pil_image = Image.open(tmp.name).convert("RGB")
+
+    os.unlink(tmp.name)
+
+    print(f"flux2klein: prompt={prompt!r}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}")
+
+    tracker.set("Generating", 0, num_inference_steps)
+
+    def _run():
+        generator = registry.acquire('flux2klein')
+        def on_step(_pipe, step_index, _timestep, kwargs):
+            tracker.set("Generating", step_index + 1, num_inference_steps)
+            return kwargs
+        return generator(
+            image=pil_image,
+            prompt=prompt,
+            num_inference_steps=num_inference_steps,
+            diffusion_norm=diffusion_coefficient,
+            callback_on_step_end=on_step,
+        ).images[0]
+    try:
+        edited = await run_in_threadpool(_run)
+    finally:
+        tracker.clear()
+
+    buf = io.BytesIO()
+    edited.save(buf, "JPEG")
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/jpeg")
+
 @app.post("/remove-background")
 async def remove_background(image: UploadFile = File(...)):
     contents = await image.read()
