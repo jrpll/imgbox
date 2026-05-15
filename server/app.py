@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import io
+import json
 import os
 import tempfile
 
@@ -10,6 +11,7 @@ from fastapi.concurrency import run_in_threadpool
 from PIL import Image
 
 from model_registry import ModelRegistry
+from progress import tracker
 
 registry = ModelRegistry()
 
@@ -61,6 +63,31 @@ async def health():
 
 
 # ---------------------------------------------------------------------------
+# Progress (SSE)
+# ---------------------------------------------------------------------------
+@app.get("/progress")
+async def progress():
+    async def stream():
+        queue = tracker.subscribe()
+        try:
+            while True:
+                snap = await queue.get()
+                payload = {
+                    "message": snap.message,
+                    "progress": snap.current / snap.total,
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+        finally:
+            tracker.unsubscribe(queue)
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
 @app.post("/generate")
@@ -84,6 +111,8 @@ async def generate(
 
     print(f"generate: text1={text1!r}  text2={text2!r}  neg={neg_prompt!r}  train_steps={num_train_steps}  inv_steps={num_inversion_steps}")
 
+    tracker.set("Loading", 0, 1)
+
     def _run():
         image_editor = registry.acquire('edit')
         image_editor.ft_invert(
@@ -95,7 +124,10 @@ async def generate(
         )
         return image_editor.edit(prompt=text2, neg_prompt=neg_prompt)
 
-    edited = await run_in_threadpool(_run)
+    try:
+        edited = await run_in_threadpool(_run)
+    finally:
+        tracker.clear()
 
     buf = io.BytesIO()
     edited.save(buf, "JPEG")
@@ -114,6 +146,8 @@ async def edit(
         neg_prompt = text1.replace(text2, "").strip(", ")
     print(f"edit: slider={slider} neg={neg_prompt!r}")
 
+    tracker.set("Loading", 0, 1)
+
     def _run():
         image_editor = registry.acquire('edit')
         num_inversion_steps = image_editor.num_inversion_steps
@@ -124,7 +158,10 @@ async def edit(
             num_skipped_steps=num_skipped_steps,
         )
 
-    edited = await run_in_threadpool(_run)
+    try:
+        edited = await run_in_threadpool(_run)
+    finally:
+        tracker.clear()
 
     buf = io.BytesIO()
     edited.save(buf, "JPEG")

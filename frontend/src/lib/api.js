@@ -41,3 +41,8 @@ export async function apiGet(path) {
   }
   return response.json();
 }
+
+export async function apiEventSource(path) {
+  const base = await getBaseUrl();
+  return new EventSource(`${base}${path}`);
+}

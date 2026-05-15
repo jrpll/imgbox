@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
-import { apiPost } from '../lib/api';
+import { apiPost, apiEventSource } from '../lib/api';
 import ThreeSpinner from './ThreeSpinner';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
@@ -15,6 +15,8 @@ export default function ImageEditor() {
   const [image, setImage] = useState(null);
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
   const [isEditingSlider, setIsEditingSlider] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -40,6 +42,34 @@ export default function ImageEditor() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setProgress(0);
+      setProgressMessage('');
+      return;
+    }
+    setProgress(0);
+    setProgressMessage('Loading');
+    let es;
+    let cancelled = false;
+    (async () => {
+      const source = await apiEventSource('/progress');
+      if (cancelled) { source.close(); return; }
+      es = source;
+      es.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data);
+          setProgress(data.progress ?? 0);
+          if (data.message) setProgressMessage(data.message);
+        } catch {}
+      };
+    })();
+    return () => {
+      cancelled = true;
+      if (es) es.close();
+    };
+  }, [isLoading]);
 
   const handleModeChange = (value) => {
     setMode(value);
@@ -277,9 +307,19 @@ export default function ImageEditor() {
               type="button"
               onClick={handleSubmit}
               disabled={!canRun}
-              className="flex-1 py-2 text-sm font-medium rounded bg-[#0ea0ff] hover:bg-blue-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className={`relative overflow-hidden flex-1 py-2 text-sm font-medium rounded text-white transition-colors ${
+                isLoading
+                  ? 'bg-[#bce4ff] cursor-wait'
+                  : 'bg-[#0ea0ff] hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed'
+              }`}
             >
-              {isLoading ? 'Processing...' : 'Run'}
+              {isLoading && (
+                <div
+                  className="absolute inset-y-0 left-0 bg-[#0ea0ff]"
+                  style={{ width: `${(progress * 100).toFixed(1)}%`, transition: 'width 200ms ease-out' }}
+                />
+              )}
+              <span className="relative">{isLoading ? (progressMessage || 'Loading') : 'Run'}</span>
             </button>
           </div>
         </div>

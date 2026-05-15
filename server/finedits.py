@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import gc
 from sklearn.cluster import KMeans
 from torchvision.transforms.functional import gaussian_blur
-from tqdm import tqdm
+from progress import ptqdm
 
 def logit_sampler(mean_logit : float = 0, std_logit : float = 1, batch_size : int = 10, device : str = "cuda", dtype = torch.bfloat16):
     u = torch.normal(mean=mean_logit, std=std_logit, size=(batch_size,), device=device, dtype = dtype)
@@ -210,7 +210,7 @@ class FINEdits:
             optimizer.zero_grad()
             z0 = torch.cat([self.z0]*batch_size)
             with torch.enable_grad():
-                for i in tqdm(range(num_train_steps*int(simulated_batch_size/batch_size))):
+                for i in ptqdm(range(num_train_steps*int(simulated_batch_size/batch_size)), "Training"):
                     noise = torch.randn_like(z0)
                     sigmas = logit_sampler(batch_size = batch_size, dtype = torch.bfloat16)
                     t=torch.tensor(sigmas*1000,device="cuda", dtype = torch.bfloat16)
@@ -239,7 +239,7 @@ class FINEdits:
         self.inversion_sigmas = self.sigmas.flip(0)
         latent = self.z0.clone()
 
-        for i,t in enumerate(self.inversion_timesteps):
+        for i,t in enumerate(ptqdm(self.inversion_timesteps, "Inverting")):
             model_input = latent
             timestep = t.expand(model_input.shape[0])
             vf_pred = self.pipe.transformer(
@@ -330,7 +330,7 @@ class FINEdits:
 
         new_zts_ref = [zT]
         latent = zT.clone()
-        for i,t in enumerate(timesteps):
+        for i,t in enumerate(ptqdm(timesteps, "Editing")):
             model_input = torch.cat([latent]*2)
             timestep = t.expand(model_input.shape[0])
             vf_pred = self.pipe.transformer(
