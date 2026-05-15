@@ -1,5 +1,23 @@
 # Devlog
 
+## 2026-05-15 — Flux2 Klein mode (VP-SDE sampling)
+
+### Backend
+- New `server/flux2klein_vp.py`: BFL's Flux2 Klein pipeline (`Flux2KleinVPSDEPipeline`) with a VP-SDE scheduler (`FlowMatchVPSDEScheduler`) that converts velocity from OT to VP interpolant and injects noise per step (matching the SD3 VP-SDE recipe). Pipeline accepts an input image + prompt and a `diffusion_norm` controlling SDE noise strength
+- `server/model_registry.py`: new `_load_flux2klein` loader pulling `black-forest-labs/FLUX.2-klein-4B` in `bfloat16`, with `token=TOKEN` (gated repo)
+- `server/app.py`: new `POST /flux2klein` endpoint. Reads upload → PIL RGB → calls pipeline via `run_in_threadpool`, returns JPEG. Wires `callback_on_step_end` to the SSE `tracker` so the frontend progress bar advances each inference step instead of jumping 0 → done
+
+### Frontend
+- New mode `frontend/src/components/modes/Flux2Klein.jsx`: prompt textarea + inference-steps + diffusion-coefficient number inputs. Empty number fields are omitted from FormData so the backend's `Form(...)` defaults (100 steps, coef 3) apply
+- Registered as `'flux2klein'` in the `MODES` map in `ImageEditor.jsx`
+- Styling mirrors `Edit.jsx` verbatim (`rows={3}`, same label/input classes) — no per-mode visual divergence
+
+### Dependency bumps (`server/pyproject.toml`)
+- `transformers==4.44.0` → `>=4.51,<5` (needed for `Qwen3ForCausalLM`, the text encoder Flux2 uses). Resolved to `4.57.6`
+- `diffusers==0.35.1` → `>=0.36` (needed for `Flux2Transformer2DModel`, `AutoencoderKLFlux2`, `pipelines.flux2.*`). Resolved to `0.37.1`
+- Dropped the `tokenizers==0.19.1` pin so it tracks transformers (resolved to `0.22.2`)
+- Smoke-tested all Flux2 + Qwen3 imports load cleanly after sync
+
 ## 2026-05-15 — Run-button spinner, drop redundant "Processing…"
 
 ### Result viewer
