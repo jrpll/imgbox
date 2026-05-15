@@ -3,7 +3,6 @@ import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowR
 import boxIconRaw from '../assets/box.svg?raw'
 import { apiPost, apiEventSource } from '../lib/api';
 import { loadState, saveState, clearState } from '../lib/persist';
-import ThreeSpinner from './ThreeSpinner';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
 
@@ -98,6 +97,7 @@ export default function ImageEditor() {
   };
 
   const handleSubmit = async () => {
+    setResult(null);
     setIsLoading(true);
     try {
       const { blob, state: newState } = await modeConfig.submit({ image, state: modeState });
@@ -366,12 +366,7 @@ export default function ImageEditor() {
           </div>
 
           <div className="flex-1 flex items-center justify-center p-4 bg-gray-50">
-            {isLoading ? (
-              <div className="flex items-center gap-3 text-gray-400">
-                <ThreeSpinner size={32} />
-                <span className="text-sm">Processing...</span>
-              </div>
-            ) : result ? (
+            {result ? (
               <div className="relative w-full h-full">
                 {isEditingSlider && (
                   <div className="absolute inset-0 bg-black/25 flex items-center justify-center z-10 rounded">
