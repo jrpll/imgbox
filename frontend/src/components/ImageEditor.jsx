@@ -17,6 +17,7 @@ const MODES = {
 export default function ImageEditor() {
   const [image, setImage] = useState(null);
   const [imageUrl, setImageUrl] = useState(null);
+  const [imageAspect, setImageAspect] = useState(null);
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -96,9 +97,10 @@ export default function ImageEditor() {
   }, [result]);
 
   useEffect(() => {
-    if (!image) { setImageUrl(null); return; }
+    if (!image) { setImageUrl(null); setImageAspect(null); return; }
     const url = URL.createObjectURL(image);
     setImageUrl(url);
+    setImageAspect(null);
     return () => URL.revokeObjectURL(url);
   }, [image]);
 
@@ -288,17 +290,25 @@ export default function ImageEditor() {
                       : `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%23d1d5db' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
               }}
             >
-              {image ? (
-                <>
-                  <img src={imageUrl} alt="Error loading image" className="max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] object-contain rounded" />
+              {image && imageUrl ? (
+                <div
+                  className="relative max-w-[calc(100%-24px)] max-h-[calc(100%-24px)]"
+                  style={{ aspectRatio: imageAspect ?? 1 }}
+                >
+                  <img
+                    src={imageUrl}
+                    alt="Error loading image"
+                    onLoad={(e) => setImageAspect(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
+                    className="block w-full h-full object-contain rounded"
+                  />
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setImage(null); setResult(null); }}
-                    className="absolute top-2 right-2 p-0.5 bg-gray-400 text-white rounded-full hover:bg-gray-500"
+                    className="absolute top-1 right-1 p-0.5 bg-gray-400 text-white rounded-full hover:bg-gray-500"
                   >
                     <X size={12} />
                   </button>
-                </>
+                </div>
               ) : (
                 <div className="flex flex-col items-center gap-2 text-gray-400">
                   <Upload size={24} />
