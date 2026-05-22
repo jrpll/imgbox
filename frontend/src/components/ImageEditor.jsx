@@ -16,6 +16,7 @@ const MODES = {
 
 export default function ImageEditor() {
   const [image, setImage] = useState(null);
+  const [imageUrl, setImageUrl] = useState(null);
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -93,6 +94,13 @@ export default function ImageEditor() {
   useEffect(() => {
     return () => { if (result) URL.revokeObjectURL(result); };
   }, [result]);
+
+  useEffect(() => {
+    if (!image) { setImageUrl(null); return; }
+    const url = URL.createObjectURL(image);
+    setImageUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
 
   const handleModeChange = (value) => {
     setMode(value);
@@ -282,7 +290,7 @@ export default function ImageEditor() {
             >
               {image ? (
                 <>
-                  <img src={URL.createObjectURL(image)} alt="Error loading image" className="max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] object-contain rounded" />
+                  <img src={imageUrl} alt="Error loading image" className="max-w-[calc(100%-24px)] max-h-[calc(100%-24px)] object-contain rounded" />
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setImage(null); setResult(null); }}
