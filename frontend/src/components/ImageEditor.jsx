@@ -25,8 +25,11 @@ export default function ImageEditor() {
   const [isEditingSlider, setIsEditingSlider] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [mode, setMode] = useState('edit');
-  const [modeState, setModeState] = useState(MODES['edit'].initialState);
+  const [mode, setMode] = useState(() => {
+    const saved = localStorage.getItem('imgbox:lastMode');
+    return saved && MODES[saved] ? saved : 'edit';
+  });
+  const [modeState, setModeState] = useState(MODES[mode].initialState);
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hfExpanded, setHfExpanded] = useState(false);
@@ -106,6 +109,7 @@ export default function ImageEditor() {
 
   const handleModeChange = (value) => {
     setMode(value);
+    localStorage.setItem('imgbox:lastMode', value);
     setMenuOpen(false);
   };
 
