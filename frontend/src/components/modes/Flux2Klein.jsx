@@ -58,7 +58,7 @@ function Inputs({ state, setState }) {
 
 async function submit({ image, state }) {
   const fd = new FormData();
-  fd.append('image', image);
+  if (image) fd.append('image', image);
   fd.append('prompt', state.prompt);
   if (state.numInferenceSteps !== '') fd.append('num_inference_steps', state.numInferenceSteps);
   if (state.diffusionCoefficient !== '') fd.append('diffusion_coefficient', state.diffusionCoefficient);
@@ -66,7 +66,7 @@ async function submit({ image, state }) {
   return { blob: await r.blob(), state };
 }
 
-const canSubmit = ({ image, state }) => !!(image && state.prompt);
+const canSubmit = ({ state }) => !!state.prompt;
 
 export default {
   label: 'flux2 klein',

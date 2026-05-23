@@ -22,6 +22,8 @@ export default function ImageEditor() {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
+  const [eta, setEta] = useState(null);
+  const loadStartRef = useRef(null);
   const [isEditingSlider, setIsEditingSlider] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -55,10 +57,14 @@ export default function ImageEditor() {
     if (!isLoading) {
       setProgress(0);
       setProgressMessage('');
+      setEta(null);
+      loadStartRef.current = null;
       return;
     }
     setProgress(0);
     setProgressMessage('Loading');
+    setEta(null);
+    loadStartRef.current = Date.now();
     let es;
     let cancelled = false;
     (async () => {
@@ -68,8 +74,13 @@ export default function ImageEditor() {
       es.onmessage = (ev) => {
         try {
           const data = JSON.parse(ev.data);
-          setProgress(data.progress ?? 0);
+          const p = data.progress ?? 0;
+          setProgress(p);
           if (data.message) setProgressMessage(data.message);
+          if (p > 0.05 && loadStartRef.current) {
+            const elapsed = (Date.now() - loadStartRef.current) / 1000;
+            setEta(Math.max(0, Math.round(elapsed * (1 - p) / p)));
+          }
         } catch {}
       };
     })();
@@ -368,6 +379,9 @@ export default function ImageEditor() {
               <span className="relative flex h-full items-center justify-center gap-2">
                 {isLoading && <DotmSquare4 size={16} dotSize={2} />}
                 {isLoading ? (progressMessage || 'Loading') : 'Run'}
+                {isLoading && eta != null && (
+                  <span className="opacity-70">· {eta >= 60 ? `${Math.floor(eta / 60)}m ${eta % 60}s` : `${eta}s`} left</span>
+                )}
               </span>
             </button>
           </div>

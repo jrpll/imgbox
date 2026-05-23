@@ -22,7 +22,7 @@ cd frontend && npm run dev
 - [ ] estimation du temps
 - [ ] dark theme ?
 - [ ] mettre quelque chose qui agrandit l'image d'input
-- [ ] mettre des croix directement sur les minias d'images plutôt que en haut à droite
+- [ ] cliquer sur l'image devrait l'agrandir
 
 ## Valider les changements
 

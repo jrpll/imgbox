@@ -170,18 +170,19 @@ async def edit(
 
 @app.post("/flux2klein")
 async def flux2klein(
-    image: UploadFile = File(...),
+    image: UploadFile | None = File(None),
     prompt: str = Form(""),
     num_inference_steps: int = Form(100),
     diffusion_coefficient: float = Form(3),
 ):
-    contents = await image.read()
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(image.filename or "img.jpg")[1])
-    tmp.write(contents)
-    tmp.close()
-    pil_image = Image.open(tmp.name).convert("RGB")
-
-    os.unlink(tmp.name)
+    pil_image = None
+    if image is not None:
+        contents = await image.read()
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(image.filename or "img.jpg")[1])
+        tmp.write(contents)
+        tmp.close()
+        pil_image = Image.open(tmp.name).convert("RGB")
+        os.unlink(tmp.name)
 
     print(f"flux2klein: prompt={prompt!r}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}")
 
