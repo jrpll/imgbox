@@ -21,9 +21,11 @@ export default function ImageEditor() {
   const [result, setResult] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [progressBar, setProgressBar] = useState({ target: 0, duration: 200 });
   const [progressMessage, setProgressMessage] = useState('');
   const [eta, setEta] = useState(null);
   const loadStartRef = useRef(null);
+  const lastTickRef = useRef(null);
   const [isEditingSlider, setIsEditingSlider] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -56,15 +58,19 @@ export default function ImageEditor() {
   useEffect(() => {
     if (!isLoading) {
       setProgress(0);
+      setProgressBar({ target: 0, duration: 200 });
       setProgressMessage('');
       setEta(null);
       loadStartRef.current = null;
+      lastTickRef.current = null;
       return;
     }
     setProgress(0);
+    setProgressBar({ target: 0, duration: 200 });
     setProgressMessage('Loading');
     setEta(null);
     loadStartRef.current = Date.now();
+    lastTickRef.current = null;
     let es;
     let cancelled = false;
     (async () => {
@@ -77,6 +83,18 @@ export default function ImageEditor() {
           const p = data.progress ?? 0;
           setProgress(p);
           if (data.message) setProgressMessage(data.message);
+
+          const now = Date.now();
+          const last = lastTickRef.current;
+          if (last) {
+            const interval = now - last.t;
+            const delta = Math.max(0, p - last.p);
+            setProgressBar({ target: Math.min(1, p + delta), duration: interval });
+          } else {
+            setProgressBar({ target: p, duration: 200 });
+          }
+          lastTickRef.current = { p, t: now };
+
           if (p > 0.05 && loadStartRef.current) {
             const elapsed = (Date.now() - loadStartRef.current) / 1000;
             setEta(Math.max(0, Math.round(elapsed * (1 - p) / p)));
@@ -373,7 +391,7 @@ export default function ImageEditor() {
               {isLoading && (
                 <div
                   className="absolute inset-y-0 left-0 bg-[#0ea0ff]"
-                  style={{ width: `${(progress * 100).toFixed(1)}%`, transition: 'width 200ms ease-out' }}
+                  style={{ width: `${(progressBar.target * 100).toFixed(1)}%`, transition: `width ${progressBar.duration}ms linear` }}
                 />
               )}
               <span className="relative flex h-full items-center justify-center gap-2">
