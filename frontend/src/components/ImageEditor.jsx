@@ -41,6 +41,7 @@ export default function ImageEditor() {
   const [hfSaved, setHfSaved] = useState(false);
   const [langExpanded, setLangExpanded] = useState(false);
   const [lang, setLang] = useState('ENG');
+  const [lightbox, setLightbox] = useState(null);
   const fileInputRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -332,7 +333,8 @@ export default function ImageEditor() {
                     src={imageUrl}
                     alt="Error loading image"
                     onLoad={(e) => setImageAspect(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
-                    className="block w-full h-full object-contain rounded"
+                    onClick={(e) => { e.stopPropagation(); setLightbox(imageUrl); }}
+                    className="block w-full h-full object-contain rounded cursor-zoom-in"
                   />
                   <button
                     type="button"
@@ -433,7 +435,7 @@ export default function ImageEditor() {
                     <span className="text-white text-sm">Updating...</span>
                   </div>
                 )}
-                <img src={result} alt="Generated" className="w-full h-full object-contain rounded" />
+                <img src={result} alt="Generated" onClick={() => setLightbox(result)} className="w-full h-full object-contain rounded cursor-pointer" />
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 text-gray-300">
@@ -445,6 +447,22 @@ export default function ImageEditor() {
       </div>
 
       {/* Settings panel */}
+
+      {lightbox && (
+        <div
+          onClick={() => setLightbox(null)}
+          className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-8 cursor-zoom-out"
+        >
+          <img src={lightbox} alt="" className="max-w-full max-h-full object-contain" onClick={(e) => e.stopPropagation()} />
+          <button
+            type="button"
+            onClick={() => setLightbox(null)}
+            className="absolute top-4 right-4 p-1.5 bg-white/10 text-white rounded-full hover:bg-white/20"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
