@@ -32,6 +32,8 @@ uv run python app.py
 - [ ] Mettre des pastilles i à côté des champs pour donner des indications
 - [ ] dark theme ?
 - [ ] add advanced settings like seed
+- [ ] add stop button 
+- [ ] drop folder working pour identity
 
 ## Valider les changements
 

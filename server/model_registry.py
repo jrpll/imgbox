@@ -9,6 +9,7 @@ from flux2klein_vp import Flux2KleinVPSDEPipeline
 
 from finedits import FINEdits
 from background_remover import BackgroundRemover
+from identity import IdentityModel
 
 TOKEN = os.getenv("HUGGING_FACE_TOKEN")
 
@@ -17,7 +18,8 @@ class ModelRegistry:
         self._loaders = {
             'edit': self._load_edit,
             'remove-background': self._load_remove_background,
-            'flux2klein': self._load_flux2klein
+            'flux2klein': self._load_flux2klein,
+            'identity': self._load_identity,
         }
         self._current_name: str | None = None
         self._current_model: Any | None = None
@@ -62,9 +64,12 @@ class ModelRegistry:
     
     def _load_remove_background(self):
         model = AutoModelForImageSegmentation.from_pretrained(
-            'briaai/RMBG-2.0', 
+            'briaai/RMBG-2.0',
             trust_remote_code=True,
             token=TOKEN
         ).eval().to("cuda")
         background_remover = BackgroundRemover(model)
         return background_remover
+
+    def _load_identity(self):
+        return IdentityModel()

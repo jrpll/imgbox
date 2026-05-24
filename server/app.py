@@ -4,16 +4,20 @@ import json
 import os
 import tempfile
 
-from fastapi import FastAPI, Form, UploadFile, File
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
 from PIL import Image
+from pillow_heif import register_heif_opener
 from tqdm import tqdm
+
+register_heif_opener()
 
 from model_registry import ModelRegistry
 from progress import tracker
+import identity_store
 
 registry = ModelRegistry()
 
@@ -173,21 +177,19 @@ async def edit(
 
 @app.post("/flux2klein")
 async def flux2klein(
-    image: UploadFile | None = File(None),
+    images: list[UploadFile] | None = File(None),
     prompt: str = Form(""),
     num_inference_steps: int = Form(100),
     diffusion_coefficient: float = Form(3),
 ):
-    pil_image = None
-    if image is not None:
-        contents = await image.read()
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(image.filename or "img.jpg")[1])
-        tmp.write(contents)
-        tmp.close()
-        pil_image = Image.open(tmp.name).convert("RGB")
-        os.unlink(tmp.name)
+    pil_images = []
+    if images:
+        for upload in images:
+            contents = await upload.read()
+            pil_images.append(Image.open(io.BytesIO(contents)).convert("RGB"))
+    pil_image = pil_images if pil_images else None
 
-    print(f"flux2klein: prompt={prompt!r}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}")
+    print(f"flux2klein: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}")
 
     tracker.set("Generating", 0, num_inference_steps)
     t = tqdm(total=num_inference_steps, desc="Generating")
@@ -215,6 +217,76 @@ async def flux2klein(
     edited.save(buf, "JPEG")
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/jpeg")
+
+@app.post("/identity")
+async def identity(images: list[UploadFile] = File(...)):
+    processed = 0
+    faces_found = 0
+    skipped = 0
+    ids: list[str] = []
+
+    tracker.set("Embedding", 0, len(images))
+
+    def _run():
+        nonlocal processed, faces_found, skipped
+        model = registry.acquire("identity")
+        for i, upload in enumerate(images):
+            contents = upload.file.read()
+            try:
+                pil = Image.open(io.BytesIO(contents)).convert("RGB")
+            except Exception:
+                skipped += 1
+                processed += 1
+                tracker.set("Embedding", processed, len(images))
+                continue
+            result = model.embed(pil)
+            if result is None:
+                skipped += 1
+            else:
+                id_, _was_new = identity_store.insert(
+                    image_bytes=contents,
+                    source_filename=upload.filename or "img",
+                    model_name=model.name,
+                    embed_result=result,
+                )
+                ids.append(id_)
+                faces_found += 1
+            processed += 1
+            tracker.set("Embedding", processed, len(images))
+
+    try:
+        await run_in_threadpool(_run)
+    finally:
+        tracker.clear()
+
+    return {
+        "processed": processed,
+        "faces_found": faces_found,
+        "skipped": skipped,
+        "ids": ids,
+    }
+
+
+@app.get("/identity/list")
+async def identity_list():
+    return identity_store.list_all()
+
+
+@app.get("/identity/crop/{id_}")
+async def identity_crop(id_: str):
+    p = identity_store.crop_path(id_)
+    if not p:
+        raise HTTPException(status_code=404)
+    return FileResponse(p, media_type="image/jpeg")
+
+
+@app.get("/identity/original/{id_}")
+async def identity_original(id_: str):
+    p = identity_store.original_path(id_)
+    if not p:
+        raise HTTPException(status_code=404)
+    return FileResponse(p)
+
 
 @app.post("/remove-background")
 async def remove_background(image: UploadFile = File(...)):

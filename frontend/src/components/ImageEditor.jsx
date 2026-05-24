@@ -2,24 +2,27 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { LANGS, LangContext, translate } from '../lib/i18n';
 import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
-import { apiPost, apiEventSource } from '../lib/api';
+import { apiPost, apiGet, apiEventSource } from '../lib/api';
 import { loadState, saveState, clearState } from '../lib/persist';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
 import flux2KleinMode from './modes/Flux2Klein';
+import identityMode from './modes/Identity';
 import { DotmSquare4 } from './dotmatrix/dotm-square-4';
 
 const MODES = {
   'edit': editMode,
   'remove-background': removeBackgroundMode,
   'flux2klein': flux2KleinMode,
+  'identity': identityMode,
 };
 
 export default function ImageEditor() {
-  const [image, setImage] = useState(null);
-  const [imageUrl, setImageUrl] = useState(null);
+  const [images, setImages] = useState([]);
+  const [imageUrls, setImageUrls] = useState([]);
   const [imageAspect, setImageAspect] = useState(null);
   const [result, setResult] = useState(null);
+  const [resultMeta, setResultMeta] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressBar, setProgressBar] = useState({ target: 0, duration: 200 });
@@ -45,8 +48,10 @@ export default function ImageEditor() {
     return saved && LANGS.includes(saved) ? saved : 'ENG';
   });
   const [lightbox, setLightbox] = useState(null);
+  const [databaseOpen, setDatabaseOpen] = useState(false);
+  const [databaseRows, setDatabaseRows] = useState(null);
 
-  const t = useMemo(() => (key) => translate(key, lang), [lang]);
+  const t = useMemo(() => (key, params) => translate(key, lang, params), [lang]);
   const handleLangChange = (l) => {
     setLang(l);
     localStorage.setItem('imgbox:lang', l);
@@ -57,7 +62,9 @@ export default function ImageEditor() {
   const menuRef = useRef(null);
 
   const modeConfig = MODES[mode];
-  const canRun = !isLoading && modeConfig.canSubmit({ image, state: modeState });
+  const maxImages = modeConfig.maxImages ?? 1;
+  const isMulti = maxImages === 'unlimited' || maxImages > 1;
+  const canRun = !isLoading && modeConfig.canSubmit({ images, state: modeState });
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -121,16 +128,19 @@ export default function ImageEditor() {
 
   useEffect(() => {
     setModeState(MODES[mode].initialState);
-    setImage(null);
+    setImages([]);
     setResult(null);
+    setResultMeta(null);
     let cancelled = false;
     (async () => {
       const saved = await loadState(mode);
       if (cancelled || !saved) return;
       const cfg = MODES[mode];
       setModeState(cfg.restoreState ? cfg.restoreState(saved.modeState) : saved.modeState);
-      if (saved.image) setImage(saved.image);
+      const restored = saved.images ?? (saved.image ? [saved.image] : []);
+      if (restored.length) setImages(restored);
       if (saved.result) setResult(URL.createObjectURL(saved.result));
+      if (saved.meta) setResultMeta(saved.meta);
     })();
     return () => { cancelled = true; };
   }, [mode]);
@@ -140,27 +150,50 @@ export default function ImageEditor() {
   }, [result]);
 
   useEffect(() => {
-    if (!image) { setImageUrl(null); setImageAspect(null); return; }
-    const url = URL.createObjectURL(image);
-    setImageUrl(url);
+    if (!images.length) { setImageUrls([]); setImageAspect(null); return; }
+    let cancelled = false;
+    const created = [];
+    (async () => {
+      const urls = await Promise.all(images.map(async (f) => {
+        const isHeic = /\.(heic|heif)$/i.test(f.name) || /image\/hei[cf]/i.test(f.type);
+        let blob = f;
+        if (isHeic) {
+          try {
+            const mod = await import('heic2any');
+            const out = await mod.default({ blob: f, toType: 'image/jpeg', quality: 0.6 });
+            blob = Array.isArray(out) ? out[0] : out;
+          } catch (e) { console.error('HEIC convert failed', e); }
+        }
+        const u = URL.createObjectURL(blob);
+        created.push(u);
+        return u;
+      }));
+      if (!cancelled) setImageUrls(urls);
+    })();
     setImageAspect(null);
-    return () => URL.revokeObjectURL(url);
-  }, [image]);
+    return () => {
+      cancelled = true;
+      created.forEach(URL.revokeObjectURL);
+    };
+  }, [images]);
 
   const handleModeChange = (value) => {
     setMode(value);
     localStorage.setItem('imgbox:lastMode', value);
     setMenuOpen(false);
+    setDatabaseOpen(false);
   };
 
   const handleSubmit = async () => {
     setResult(null);
+    setResultMeta(null);
     setIsLoading(true);
     try {
-      const { blob, state: newState } = await modeConfig.submit({ image, state: modeState });
-      setModeState(newState);
-      setResult(URL.createObjectURL(blob));
-      await saveState(mode, { modeState: newState, image, result: blob });
+      const { blob, state: newState, meta } = await modeConfig.submit({ images, state: modeState });
+      setModeState(newState ?? modeState);
+      if (blob) setResult(URL.createObjectURL(blob));
+      if (meta) setResultMeta(meta);
+      await saveState(mode, { modeState: newState ?? modeState, images, result: blob, meta });
     } catch (err) {
       console.error('Error:', err);
     } finally {
@@ -170,16 +203,53 @@ export default function ImageEditor() {
 
   const handleReset = async () => {
     setModeState(modeConfig.initialState);
-    setImage(null);
+    setImages([]);
     setResult(null);
+    setResultMeta(null);
     await clearState(mode);
   };
 
-  const handleDrop = (e) => {
+  const addFiles = (incoming) => {
+    const fresh = Array.from(incoming).filter(f => f.type.startsWith('image/'));
+    if (!fresh.length) return;
+    setImages(prev => {
+      const combined = isMulti ? [...prev, ...fresh] : fresh.slice(0, 1);
+      return maxImages === 'unlimited' ? combined : combined.slice(0, maxImages);
+    });
+  };
+
+  const handleDrop = async (e) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) setImage(file);
     setIsDragging(false);
+    const items = e.dataTransfer.items;
+    if (!items || !items[0]?.webkitGetAsEntry) {
+      addFiles(e.dataTransfer.files);
+      return;
+    }
+    const files = [];
+    for (const item of items) {
+      const entry = item.webkitGetAsEntry();
+      if (!entry) continue;
+      if (entry.isFile) {
+        await new Promise((res) => entry.file((f) => { files.push(f); res(); }, res));
+      } else if (entry.isDirectory) {
+        const reader = entry.createReader();
+        while (true) {
+          const batch = await new Promise((res) => reader.readEntries(res, () => res([])));
+          if (!batch.length) break;
+          for (const child of batch) {
+            if (!child.isFile) continue;
+            await new Promise((res) => child.file((f) => { files.push(f); res(); }, res));
+          }
+        }
+      }
+    }
+    addFiles(files);
+  };
+
+  const removeImageAt = (idx) => {
+    setImages(prev => prev.filter((_, i) => i !== idx));
+    setResult(null);
   };
 
   const Inputs = modeConfig.Inputs;
@@ -198,7 +268,7 @@ export default function ImageEditor() {
             className="flex items-center gap-2 px-4 py-1.5 text-base font-normal leading-none border border-gray-300 rounded hover:bg-gray-50 transition-colors min-w-[180px] justify-between"
             style={{ textBox: 'trim-both cap alphabetic' }}
           >
-            {t(modeConfig.label)}
+            {databaseOpen ? t('common.database') : t(modeConfig.label)}
             <CaretDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
           </button>
           {menuOpen && (
@@ -207,11 +277,29 @@ export default function ImageEditor() {
                 <button
                   key={value}
                   onClick={() => handleModeChange(value)}
-                  className={`w-full text-left px-4 py-2 text-base font-normal transition-colors ${mode === value ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                  className={`w-full text-left px-4 py-2 text-base font-normal transition-colors ${!databaseOpen && mode === value ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
                 >
                   {t(cfg.label)}
                 </button>
               ))}
+              <div className="border-t border-gray-100 my-1" />
+              <button
+                onClick={async () => {
+                  setMenuOpen(false);
+                  setDatabaseOpen(true);
+                  setDatabaseRows(null);
+                  try {
+                    const rows = await apiGet('/identity/list');
+                    setDatabaseRows(rows);
+                  } catch (e) {
+                    console.error(e);
+                    setDatabaseRows([]);
+                  }
+                }}
+                className={`w-full text-left px-4 py-2 text-base font-normal transition-colors ${databaseOpen ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+              >
+                {t('common.database')}
+              </button>
             </div>
           )}
         </div>
@@ -274,8 +362,52 @@ export default function ImageEditor() {
         </div>
       </div>
 
-      {/* Main row — two cards */}
+      {/* Main row — two cards, or single database card */}
       <div className="flex gap-4 flex-1 min-h-0">
+
+      {databaseOpen ? (
+        <div className="flex-1 flex flex-col rounded border border-gray-200 overflow-hidden">
+          <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
+            <span className="font-semibold">
+              {t('common.database')}
+              {databaseRows && databaseRows.length > 0 && <span className="text-gray-400 font-normal"> · {databaseRows.length}</span>}
+            </span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-5 bg-gray-50">
+            {databaseRows === null ? (
+              <div className="flex items-center justify-center h-full text-gray-300">
+                <DotmSquare4 size={24} dotSize={3} />
+              </div>
+            ) : databaseRows.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                {t('common.empty_database')}
+              </div>
+            ) : (
+              <div className="grid grid-cols-6 gap-3">
+                {databaseRows.map(row => {
+                  const url = `/identity/crop/${row.id}`;
+                  const gender = row.gender === 0 ? 'F' : row.gender === 1 ? 'M' : '—';
+                  const conf = typeof row.det_score === 'number' ? row.det_score.toFixed(2) : '—';
+                  const date = (row.created_at || '').slice(0, 10);
+                  return (
+                    <div key={row.id} className="flex flex-col gap-1">
+                      <img
+                        src={url}
+                        onClick={() => setLightbox(url)}
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        className="w-full aspect-square object-cover rounded cursor-zoom-in bg-gray-100"
+                      />
+                      <div className="text-xs text-gray-700 truncate" title={row.source_filename}>{row.source_filename}</div>
+                      <div className="text-[11px] text-gray-400">{gender} · {row.age >= 0 ? row.age : '—'} · {conf}</div>
+                      <div className="text-[11px] text-gray-300">{date}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (<>
 
         {/* Input card */}
         <div className="flex-1 flex flex-col rounded border border-gray-200 overflow-hidden">
@@ -315,49 +447,71 @@ export default function ImageEditor() {
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
             >
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('common.image')}</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600">
+              {t('common.image')}
+              {isMulti && images.length > 0 && <span className="text-gray-300"> · {images.length}</span>}
+            </span>
             <div
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => (isMulti || !images.length) && fileInputRef.current?.click()}
               onDragEnter={() => setIsDragging(true)}
               onDragLeave={() => setIsDragging(false)}
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
-              className={`relative h-40 flex items-center justify-center rounded cursor-pointer overflow-hidden transition-colors ${
-                isDragging ? 'bg-gray-100' : image ? '' : 'bg-gray-50'
-              }`}
+              className={`relative h-40 flex items-center justify-center rounded overflow-hidden transition-colors ${
+                isMulti || !images.length ? 'cursor-pointer' : ''
+              } ${isDragging ? 'bg-gray-100' : images.length ? '' : 'bg-gray-50'}`}
               style={{
                 backgroundImage: isDragging
                   ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%239ca3af' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
                   : isHovered
                     ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%239ca3af' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
-                    : image
+                    : images.length && !isMulti
                       ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%23e5e7eb' stroke-width='2' stroke-dasharray='0' stroke-linecap='square'/%3e%3c/svg%3e")`
                       : `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%23d1d5db' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
               }}
             >
-              {image && imageUrl ? (
+              {!images.length ? (
+                <div className="flex flex-col items-center gap-2 text-gray-400">
+                  <Upload size={24} />
+                </div>
+              ) : isMulti ? (
+                <div className="w-full h-full flex gap-2 p-2 overflow-x-auto">
+                  {imageUrls.map((url, i) => (
+                    <div key={i} className="relative h-full aspect-square flex-shrink-0 group/thumb">
+                      <img
+                        src={url}
+                        onClick={(e) => { e.stopPropagation(); setLightbox(url); }}
+                        className="w-full h-full object-cover rounded cursor-zoom-in"
+                      />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); removeImageAt(i); }}
+                        className="absolute top-1 right-1 p-0.5 bg-gray-400 text-white rounded-full hover:bg-gray-500 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                      >
+                        <X size={10} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
                 <div
                   className="relative max-w-[calc(100%-24px)] max-h-[calc(100%-24px)]"
                   style={{ aspectRatio: imageAspect ?? 1 }}
                 >
                   <img
-                    src={imageUrl}
+                    src={imageUrls[0]}
                     alt="Error loading image"
                     onLoad={(e) => setImageAspect(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
-                    onClick={(e) => { e.stopPropagation(); setLightbox(imageUrl); }}
+                    onClick={(e) => { e.stopPropagation(); setLightbox(imageUrls[0]); }}
                     className="block w-full h-full object-contain rounded cursor-zoom-in"
                   />
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setImage(null); setResult(null); }}
+                    onClick={(e) => { e.stopPropagation(); removeImageAt(0); }}
                     className="absolute top-1 right-1 p-0.5 bg-gray-400 text-white rounded-full hover:bg-gray-500"
                   >
                     <X size={12} />
                   </button>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-gray-400">
-                  <Upload size={24} />
                 </div>
               )}
             </div>
@@ -366,7 +520,9 @@ export default function ImageEditor() {
               type="file"
               className="hidden"
               accept="image/*"
-              onChange={(e) => { const f = e.target.files[0]; if (f) setImage(f); }}
+              multiple={isMulti}
+              {...(isMulti ? { webkitdirectory: '', directory: '' } : {})}
+              onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
             />
             </div>
           </div>
@@ -438,8 +594,10 @@ export default function ImageEditor() {
             )}
           </div>
 
-          <div className="flex-1 flex items-center justify-center p-4 bg-gray-50">
-            {result ? (
+          <div className="flex-1 flex items-center justify-center p-4 bg-gray-50 overflow-hidden">
+            {modeConfig.Result ? (
+              <modeConfig.Result result={result} meta={resultMeta} onZoom={setLightbox} />
+            ) : result ? (
               <div className="relative w-full h-full">
                 {isEditingSlider && (
                   <div className="absolute inset-0 bg-black/25 flex items-center justify-center z-10 rounded">
@@ -455,6 +613,7 @@ export default function ImageEditor() {
             )}
           </div>
         </div>
+      </>)}
       </div>
 
       {/* Settings panel */}

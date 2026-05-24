@@ -139,10 +139,10 @@ function Inputs({ state, setState }) {
   );
 }
 
-async function submit({ image, state }) {
+async function submit({ images, state }) {
   if (state.step === 1) {
     const fd = new FormData();
-    fd.append('image', image);
+    fd.append('image', images[0]);
     fd.append('text1', state.text1);
     fd.append('text2', state.text2);
     fd.append('num_train_steps', state.numTrainSteps);
@@ -160,13 +160,14 @@ async function submit({ image, state }) {
   }
 }
 
-const canSubmit = ({ image, state }) => {
-  if (state.step === 1) return !!(image && state.text1 && state.text2 && state.numTrainSteps && state.numInversionSteps);
+const canSubmit = ({ images, state }) => {
+  if (state.step === 1) return !!(images.length && state.text1 && state.text2 && state.numTrainSteps && state.numInversionSteps);
   return !!(state.trained && state.text2);
 };
 
 export default {
   label: 'mode.edit',
+  maxImages: 1,
   initialState,
   Inputs,
   submit,

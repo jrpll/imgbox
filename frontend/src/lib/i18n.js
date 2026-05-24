@@ -10,8 +10,11 @@ const translations = {
     'common.run': 'Run',
     'common.loading': 'Loading',
     'common.image': 'Image',
+    'common.pick_folder': 'or pick a folder',
     'common.left': 'left',
     'common.settings': 'Settings',
+    'common.database': 'database',
+    'common.empty_database': 'No identities stored yet',
     'common.hf_token': 'HF token',
     'common.saved': 'Saved',
     'common.language': 'Language',
@@ -19,6 +22,8 @@ const translations = {
     'mode.edit': 'edit',
     'mode.remove-background': 'remove background',
     'mode.flux2klein': 'flux2 klein',
+    'mode.identity': 'identity',
+    'identity.summary': '{processed} images processed, {faces_found} faces found, {skipped} skipped (no face)',
     'edit.source': 'Source description',
     'edit.target': 'Target description',
     'edit.training_steps': 'Training steps',
@@ -35,6 +40,7 @@ const translations = {
     'progress.Training': 'Training',
     'progress.Inverting': 'Inverting',
     'progress.Editing': 'Editing',
+    'progress.Embedding': 'Embedding',
   },
   FR: {
     'common.input': 'Entrée',
@@ -43,8 +49,11 @@ const translations = {
     'common.run': 'Lancer',
     'common.loading': 'Chargement',
     'common.image': 'Image',
+    'common.pick_folder': 'ou choisir un dossier',
     'common.left': 'restant',
     'common.settings': 'Paramètres',
+    'common.database': 'base de données',
+    'common.empty_database': 'Aucune identité enregistrée',
     'common.hf_token': 'Token HF',
     'common.saved': 'Enregistré',
     'common.language': 'Langue',
@@ -52,6 +61,8 @@ const translations = {
     'mode.edit': 'édition',
     'mode.remove-background': "supprimer l'arrière-plan",
     'mode.flux2klein': 'flux2 klein',
+    'mode.identity': 'identité',
+    'identity.summary': '{processed} images traitées, {faces_found} visages trouvés, {skipped} ignorées (aucun visage)',
     'edit.source': "Description de l'image",
     'edit.target': 'Description souhaitée',
     'edit.training_steps': "Étapes d'entraînement",
@@ -68,6 +79,7 @@ const translations = {
     'progress.Training': 'Entraînement',
     'progress.Inverting': 'Inversion',
     'progress.Editing': 'Édition',
+    'progress.Embedding': 'Encodage',
   },
   ESP: {
     'common.input': 'Entrada',
@@ -76,8 +88,11 @@ const translations = {
     'common.run': 'Ejecutar',
     'common.loading': 'Cargando',
     'common.image': 'Imagen',
+    'common.pick_folder': 'o elegir una carpeta',
     'common.left': 'restante',
     'common.settings': 'Ajustes',
+    'common.database': 'base de datos',
+    'common.empty_database': 'Sin identidades guardadas',
     'common.hf_token': 'Token HF',
     'common.saved': 'Guardado',
     'common.language': 'Idioma',
@@ -85,6 +100,8 @@ const translations = {
     'mode.edit': 'edición',
     'mode.remove-background': 'quitar fondo',
     'mode.flux2klein': 'flux2 klein',
+    'mode.identity': 'identidad',
+    'identity.summary': '{processed} imágenes procesadas, {faces_found} rostros encontrados, {skipped} omitidas (sin rostro)',
     'edit.source': 'Descripción original',
     'edit.target': 'Descripción deseada',
     'edit.training_steps': 'Pasos de entrenamiento',
@@ -101,16 +118,21 @@ const translations = {
     'progress.Training': 'Entrenando',
     'progress.Inverting': 'Invirtiendo',
     'progress.Editing': 'Editando',
+    'progress.Embedding': 'Codificando',
   },
 };
 
-export function translate(key, lang) {
-  return translations[lang]?.[key] ?? translations.ENG[key] ?? key;
+export function translate(key, lang, params) {
+  let str = translations[lang]?.[key] ?? translations.ENG[key] ?? key;
+  if (params) {
+    str = str.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? '');
+  }
+  return str;
 }
 
 export const LangContext = createContext({
   lang: 'ENG',
-  t: (k) => translate(k, 'ENG'),
+  t: (k, p) => translate(k, 'ENG', p),
   setLang: () => {},
 });
 

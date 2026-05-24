@@ -58,9 +58,9 @@ function Inputs({ state, setState }) {
   );
 }
 
-async function submit({ image, state }) {
+async function submit({ images, state }) {
   const fd = new FormData();
-  if (image) fd.append('image', image);
+  for (const img of images) fd.append('images', img);
   fd.append('prompt', state.prompt);
   if (state.numInferenceSteps !== '') fd.append('num_inference_steps', state.numInferenceSteps);
   if (state.diffusionCoefficient !== '') fd.append('diffusion_coefficient', state.diffusionCoefficient);
@@ -72,6 +72,7 @@ const canSubmit = ({ state }) => !!state.prompt;
 
 export default {
   label: 'mode.flux2klein',
+  maxImages: 'unlimited',
   initialState,
   Inputs,
   submit,
