@@ -441,7 +441,7 @@ export default function ImageEditor() {
                     <span className="text-white text-sm">{t('common.updating')}</span>
                   </div>
                 )}
-                <img src={result} alt="Generated" onClick={() => setLightbox(result)} className="w-full h-full object-contain rounded cursor-pointer" />
+                <img src={result} alt="Generated" onClick={() => setLightbox(result)} className="w-full h-full object-contain rounded cursor-zoom-in" />
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2 text-gray-300">

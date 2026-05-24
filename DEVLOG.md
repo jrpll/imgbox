@@ -1,5 +1,30 @@
 # Devlog
 
+## 2026-05-24 — Persistence, progress ETA, smooth bar, lightbox, i18n
+
+### Persistence
+- Last-used mode saved to `localStorage` (`imgbox:lang`, `imgbox:lastMode`) so the app reopens on the mode and language the user left off in, instead of resetting to defaults
+
+### Progress: live "MM:SS" remaining
+- `server/progress.py`: `Snapshot` gained a `remaining` string; new `tracker.set_from_tqdm(t)` reads tqdm's EMA-smoothed rate from `format_dict['rate']` and formats `(total - n) / rate` via `tqdm.format_interval`, producing the same `00:23` you see in the terminal
+- `ptqdm` publishes it after every iteration; `/flux2klein` keeps its own visible tqdm and feeds it through `set_from_tqdm` from `callback_on_step_end`
+- `/progress` SSE payload now carries `remaining`; frontend just displays `· {remaining} left` next to the progress message — dropped the earlier client-side `elapsed × (1 − progress) / progress` formula, since it averaged across phases and was poisoned by start-of-run dead time
+
+### Smooth progress bar
+- Bar target predicts one step ahead (`p + delta`) with a CSS `linear` transition whose duration matches the last SSE interval, so the bar glides continuously between events and self-corrects across phase changes instead of jumping per forward pass
+
+### flux2klein: text-to-image
+- Made image optional everywhere: backend `image: UploadFile | None = File(None)` with a `pil_image = None` fallback (pipeline already handled `image=None`); frontend `canSubmit` now only requires a prompt; FormData skips the `image` field when empty
+
+### Lightbox
+- Clicking the uploaded image (or result) opens a full-screen overlay; clicking the input area's empty/gray space still triggers the file picker, since the lightbox handler is on the `<img>` with `stopPropagation`
+- `cursor-zoom-in` on both images for affordance (result image previously had `cursor-pointer` — fixed)
+
+### i18n (FR / ENG / ESP)
+- New `frontend/src/lib/i18n.js`: translation dicts, `translate(key, lang)` with ENG/key fallbacks, `LangContext` + `useLang()` hook
+- `ImageEditor.jsx` provides the context, persists `lang` to `localStorage['imgbox:lang']`, and routes every UI string through `t(...)` — including the SSE progress message (`t('progress.' + msg)`) and the `left` suffix
+- Mode contract update: `label` is now a translation key (e.g. `'mode.edit'`); `getStepLabel` receives `t` as a second arg
+
 ## 2026-05-15 — Flux2 Klein mode (VP-SDE sampling)
 
 ### Backend
