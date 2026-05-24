@@ -91,20 +91,25 @@ export default function ImageEditor() {
         try {
           const data = JSON.parse(ev.data);
           const p = data.progress ?? 0;
+          const msg = data.message ?? '';
           setProgress(p);
-          if (data.message) setProgressMessage(data.message);
+          if (msg) setProgressMessage(msg);
           setRemaining(data.remaining ?? '');
 
           const now = Date.now();
           const last = lastTickRef.current;
-          if (last) {
+          const phaseChanged = last && last.msg !== msg;
+          if (!last || phaseChanged) {
+            setProgressBar({ target: p, duration: 200 });
+          } else {
             const interval = now - last.t;
             const delta = Math.max(0, p - last.p);
-            setProgressBar({ target: Math.min(1, p + delta), duration: interval });
-          } else {
-            setProgressBar({ target: p, duration: 200 });
+            setProgressBar(prev => ({
+              target: Math.max(prev.target, Math.min(1, p + delta)),
+              duration: interval,
+            }));
           }
-          lastTickRef.current = { p, t: now };
+          lastTickRef.current = { p, t: now, msg };
         } catch {}
       };
     })();
@@ -460,7 +465,7 @@ export default function ImageEditor() {
           onClick={() => setLightbox(null)}
           className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-8 cursor-zoom-out"
         >
-          <img src={lightbox} alt="" className="max-w-full max-h-full object-contain" onClick={(e) => e.stopPropagation()} />
+          <img src={lightbox} alt="" className="max-w-full max-h-full object-contain" />
           <button
             type="button"
             onClick={() => setLightbox(null)}
