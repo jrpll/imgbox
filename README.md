@@ -31,6 +31,7 @@ uv run python app.py
 - [ ] Renommer les items dans le drop down "edit" -> "sd3 + gommette edit", ainsi que les routes
 - [ ] Mettre des pastilles i à côté des champs pour donner des indications
 - [ ] dark theme ?
+- [ ] add advanced settings like seed
 
 ## Valider les changements
 
