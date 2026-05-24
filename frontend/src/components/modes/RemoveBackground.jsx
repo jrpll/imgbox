@@ -8,7 +8,7 @@ async function submit({ image, state }) {
 }
 
 export default {
-  label: 'remove background',
+  label: 'mode.remove-background',
   initialState: {},
   Inputs: () => null,
   submit,

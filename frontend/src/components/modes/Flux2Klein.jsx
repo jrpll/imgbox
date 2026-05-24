@@ -1,5 +1,6 @@
 import { X } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
+import { useLang } from '../../lib/i18n';
 
 const initialState = {
   prompt: '',
@@ -8,12 +9,13 @@ const initialState = {
 };
 
 function Inputs({ state, setState }) {
+  const { t } = useLang();
   const set = (patch) => setState((s) => ({ ...s, ...patch }));
 
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
       <div className="group flex flex-col gap-1">
-        <span className="text-xs text-gray-400 group-hover:text-gray-600">Prompt</span>
+        <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('flux.prompt')}</span>
         <div className="relative">
           <textarea
             value={state.prompt}
@@ -31,7 +33,7 @@ function Inputs({ state, setState }) {
 
       <div className="flex gap-3">
         <div className="group flex-1 flex flex-col gap-1">
-          <span className="text-xs text-gray-400 group-hover:text-gray-600">Inference steps</span>
+          <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('flux.inference_steps')}</span>
           <input
             type="number"
             placeholder="100"
@@ -41,7 +43,7 @@ function Inputs({ state, setState }) {
           />
         </div>
         <div className="group flex-1 flex flex-col gap-1">
-          <span className="text-xs text-gray-400 group-hover:text-gray-600">Diffusion coefficient</span>
+          <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('flux.diffusion_coefficient')}</span>
           <input
             type="number"
             step="0.1"
@@ -69,7 +71,7 @@ async function submit({ image, state }) {
 const canSubmit = ({ state }) => !!state.prompt;
 
 export default {
-  label: 'flux2 klein',
+  label: 'mode.flux2klein',
   initialState,
   Inputs,
   submit,

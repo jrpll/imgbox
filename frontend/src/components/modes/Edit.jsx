@@ -1,5 +1,6 @@
 import { X } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
+import { useLang } from '../../lib/i18n';
 
 const initialState = {
   step: 1,
@@ -13,6 +14,7 @@ const initialState = {
 };
 
 function Inputs({ state, setState }) {
+  const { t } = useLang();
   const set = (patch) => setState((s) => ({ ...s, ...patch }));
   const locked = !state.trained;
 
@@ -21,7 +23,7 @@ function Inputs({ state, setState }) {
       {state.step === 1 ? (
         <>
           <div className="group flex flex-col gap-1">
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">Source description</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.source')}</span>
             <div className="relative">
               <textarea
                 value={state.text1}
@@ -38,7 +40,7 @@ function Inputs({ state, setState }) {
           </div>
 
           <div className="group flex flex-col gap-1">
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">Target description</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.target')}</span>
             <div className="relative">
               <textarea
                 value={state.text2}
@@ -56,7 +58,7 @@ function Inputs({ state, setState }) {
 
           <div className="flex gap-3">
             <div className="group flex-1 flex flex-col gap-1">
-              <span className="text-xs text-gray-400 group-hover:text-gray-600">Training steps</span>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.training_steps')}</span>
               <input
                 type="number"
                 placeholder="100"
@@ -66,7 +68,7 @@ function Inputs({ state, setState }) {
               />
             </div>
             <div className="group flex-1 flex flex-col gap-1">
-              <span className="text-xs text-gray-400 group-hover:text-gray-600">Inversion steps</span>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.inversion_steps')}</span>
               <input
                 type="number"
                 placeholder="50"
@@ -80,7 +82,7 @@ function Inputs({ state, setState }) {
       ) : (
         <>
           <div className={`${locked ? '' : 'group '}flex flex-col gap-1`}>
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">Target description</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.target')}</span>
             <div className="relative">
               <textarea
                 value={state.text2}
@@ -98,7 +100,7 @@ function Inputs({ state, setState }) {
           </div>
 
           <div className={`${locked ? '' : 'group '}flex flex-col gap-1`}>
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">Negative prompt</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.negative_prompt')}</span>
             <div className="relative">
               <textarea
                 value={state.negPrompt}
@@ -117,7 +119,7 @@ function Inputs({ state, setState }) {
 
           <div className={`${locked ? '' : 'group '}flex flex-col gap-1.5`}>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400 group-hover:text-gray-600">Image preservation</span>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.preservation')}</span>
               <span className="text-xs text-gray-400 group-hover:text-gray-600">{Math.round((1 - state.slider) * 100)}%</span>
             </div>
             <input
@@ -164,12 +166,12 @@ const canSubmit = ({ image, state }) => {
 };
 
 export default {
-  label: 'edit',
+  label: 'mode.edit',
   initialState,
   Inputs,
   submit,
   canSubmit,
   totalSteps: 2,
-  getStepLabel: (state) => state.step === 1 ? 'Training' : 'Edit',
+  getStepLabel: (state, t) => state.step === 1 ? t('edit.step.training') : t('edit.step.edit'),
   restoreState: (state) => ({ ...state, step: 1, trained: false }),
 };

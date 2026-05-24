@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { LANGS, LangContext, translate } from '../lib/i18n';
 import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
 import { apiPost, apiEventSource } from '../lib/api';
@@ -39,8 +40,19 @@ export default function ImageEditor() {
   const [hfToken, setHfToken] = useState('');
   const [hfSaved, setHfSaved] = useState(false);
   const [langExpanded, setLangExpanded] = useState(false);
-  const [lang, setLang] = useState('ENG');
+  const [lang, setLang] = useState(() => {
+    const saved = localStorage.getItem('imgbox:lang');
+    return saved && LANGS.includes(saved) ? saved : 'ENG';
+  });
   const [lightbox, setLightbox] = useState(null);
+
+  const t = useMemo(() => (key) => translate(key, lang), [lang]);
+  const handleLangChange = (l) => {
+    setLang(l);
+    localStorage.setItem('imgbox:lang', l);
+    setLangExpanded(false);
+  };
+  const langCtx = useMemo(() => ({ lang, t, setLang: handleLangChange }), [lang, t]);
   const fileInputRef = useRef(null);
   const menuRef = useRef(null);
 
@@ -168,6 +180,7 @@ export default function ImageEditor() {
   const Inputs = modeConfig.Inputs;
 
   return (
+    <LangContext.Provider value={langCtx}>
     <div className="relative h-screen bg-white flex flex-col p-5 gap-3 overflow-hidden">
 
       {/* Header */}
@@ -180,7 +193,7 @@ export default function ImageEditor() {
             className="flex items-center gap-2 px-4 py-1.5 text-base font-normal leading-none border border-gray-300 rounded hover:bg-gray-50 transition-colors min-w-[180px] justify-between"
             style={{ textBox: 'trim-both cap alphabetic' }}
           >
-            {modeConfig.label}
+            {t(modeConfig.label)}
             <CaretDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
           </button>
           {menuOpen && (
@@ -191,7 +204,7 @@ export default function ImageEditor() {
                   onClick={() => handleModeChange(value)}
                   className={`w-full text-left px-4 py-2 text-base font-normal transition-colors ${mode === value ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
                 >
-                  {cfg.label}
+                  {t(cfg.label)}
                 </button>
               ))}
             </div>
@@ -203,13 +216,13 @@ export default function ImageEditor() {
           </button>
           {settingsOpen && (
             <div className="absolute top-0 right-0 h-full w-96 bg-white border-l border-gray-200 shadow-lg flex flex-col z-50">
-              <div className="px-5 pt-5 pb-3 border-b border-gray-100 font-semibold">Settings</div>
+              <div className="px-5 pt-5 pb-3 border-b border-gray-100 font-semibold">{t('common.settings')}</div>
               <div className="flex flex-col py-2">
                 <button
                   onClick={() => { setHfExpanded(o => !o); setHfSaved(false); }}
                   className="text-left px-5 py-3 text-sm hover:bg-gray-50 transition-colors"
                 >
-                  HF token
+                  {t('common.hf_token')}
                 </button>
                 {hfExpanded && (
                   <div className="px-5 pb-3">
@@ -228,21 +241,21 @@ export default function ImageEditor() {
                       placeholder="hf_..."
                       className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:border-gray-400"
                     />
-                    {hfSaved && <span className="text-xs text-green-500 mt-1 block">Saved</span>}
+                    {hfSaved && <span className="text-xs text-green-500 mt-1 block">{t('common.saved')}</span>}
                   </div>
                 )}
                 <button
                   onClick={() => setLangExpanded(o => !o)}
                   className="text-left px-5 py-3 text-sm hover:bg-gray-50 transition-colors"
                 >
-                  Language
+                  {t('common.language')}
                 </button>
                 {langExpanded && (
                   <div className="flex flex-col">
-                    {['FR', 'ENG', 'ESP'].map(l => (
+                    {LANGS.map(l => (
                       <button
                         key={l}
-                        onClick={() => { setLang(l); setLangExpanded(false); }}
+                        onClick={() => handleLangChange(l)}
                         className={`text-left px-8 py-2 text-sm transition-colors ${lang === l ? 'text-black font-medium' : 'text-gray-500 hover:bg-gray-50'}`}
                       >
                         {l}
@@ -263,9 +276,9 @@ export default function ImageEditor() {
         <div className="flex-1 flex flex-col rounded border border-gray-200 overflow-hidden">
           <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
             <span className="font-semibold">
-              Input
+              {t('common.input')}
               {modeConfig.getStepLabel && (
-                <span className="text-gray-400 font-normal"> · {modeConfig.getStepLabel(modeState)}</span>
+                <span className="text-gray-400 font-normal"> · {modeConfig.getStepLabel(modeState, t)}</span>
               )}
             </span>
             {modeConfig.totalSteps && (
@@ -297,7 +310,7 @@ export default function ImageEditor() {
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
             >
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">Image</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('common.image')}</span>
             <div
               onClick={() => fileInputRef.current?.click()}
               onDragEnter={() => setIsDragging(true)}
@@ -371,7 +384,7 @@ export default function ImageEditor() {
               onClick={handleReset}
               className="px-4 h-9 text-sm border border-gray-300 rounded text-gray-600 hover:bg-gray-50 transition-colors"
             >
-              Reset
+              {t('common.reset')}
             </button>
             <button
               type="button"
@@ -391,9 +404,9 @@ export default function ImageEditor() {
               )}
               <span className="relative flex h-full items-center justify-center gap-2">
                 {isLoading && <DotmSquare4 size={16} dotSize={2} />}
-                {isLoading ? (progressMessage || 'Loading') : 'Run'}
+                {isLoading ? t('progress.' + (progressMessage || 'Loading')) : t('common.run')}
                 {isLoading && remaining && (
-                  <span className="opacity-70">· {remaining} left</span>
+                  <span className="opacity-70">· {remaining} {t('common.left')}</span>
                 )}
               </span>
             </button>
@@ -403,7 +416,7 @@ export default function ImageEditor() {
         {/* Result card */}
         <div className="flex-1 flex flex-col rounded border border-gray-200 overflow-hidden">
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100">
-            <span className="font-semibold">Result</span>
+            <span className="font-semibold">{t('common.result')}</span>
             {result && (
               <button
                 type="button"
@@ -425,7 +438,7 @@ export default function ImageEditor() {
               <div className="relative w-full h-full">
                 {isEditingSlider && (
                   <div className="absolute inset-0 bg-black/25 flex items-center justify-center z-10 rounded">
-                    <span className="text-white text-sm">Updating...</span>
+                    <span className="text-white text-sm">{t('common.updating')}</span>
                   </div>
                 )}
                 <img src={result} alt="Generated" onClick={() => setLightbox(result)} className="w-full h-full object-contain rounded cursor-pointer" />
@@ -441,6 +454,7 @@ export default function ImageEditor() {
 
       {/* Settings panel */}
 
+      {/* lightbox */}
       {lightbox && (
         <div
           onClick={() => setLightbox(null)}
@@ -457,5 +471,6 @@ export default function ImageEditor() {
         </div>
       )}
     </div>
+    </LangContext.Provider>
   );
 }
