@@ -7,6 +7,7 @@ import tempfile
 from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
 from PIL import Image
 from tqdm import tqdm
@@ -231,6 +232,14 @@ async def remove_background(image: UploadFile = File(...)):
     pil_image.save(buf, "png")
     buf.seek(0)
     return StreamingResponse(buf, media_type="image/png")
+
+# ---------------------------------------------------------------------------
+# Frontend (built SPA) — mounted last so API routes take precedence
+# ---------------------------------------------------------------------------
+_FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.isdir(_FRONTEND_DIST):
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIST, html=True), name="frontend")
+
 
 # ---------------------------------------------------------------------------
 # Entry point

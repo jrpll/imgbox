@@ -15,8 +15,12 @@ async function getBaseUrl() {
     const { invoke } = await import('@tauri-apps/api/core');
     const config = await invoke('get_server_config');
     _baseUrl = config.mode === 'remote' ? config.remote_url : 'http://127.0.0.1:8080';
+  } else if (import.meta.env.VITE_API_URL) {
+    _baseUrl = import.meta.env.VITE_API_URL;
+  } else if (window.location.port === '5173') {
+    _baseUrl = 'http://127.0.0.1:8080';
   } else {
-    _baseUrl = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8080';
+    _baseUrl = '';
   }
 
   return _baseUrl;

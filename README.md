@@ -14,6 +14,17 @@ Start the UI
 cd frontend && npm run dev
 ```
 
+## Build frontend for single command launch
+
+```bash
+npm run build
+```
+
+Then we can just do
+```bash
+uv run python app.py
+```
+
 ## Todo
 
 - [ ] Ajouter clear cache option dans le panel de droite
