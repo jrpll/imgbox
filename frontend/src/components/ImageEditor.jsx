@@ -23,8 +23,7 @@ export default function ImageEditor() {
   const [progress, setProgress] = useState(0);
   const [progressBar, setProgressBar] = useState({ target: 0, duration: 200 });
   const [progressMessage, setProgressMessage] = useState('');
-  const [eta, setEta] = useState(null);
-  const loadStartRef = useRef(null);
+  const [remaining, setRemaining] = useState('');
   const lastTickRef = useRef(null);
   const [isEditingSlider, setIsEditingSlider] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -61,16 +60,14 @@ export default function ImageEditor() {
       setProgress(0);
       setProgressBar({ target: 0, duration: 200 });
       setProgressMessage('');
-      setEta(null);
-      loadStartRef.current = null;
+      setRemaining('');
       lastTickRef.current = null;
       return;
     }
     setProgress(0);
     setProgressBar({ target: 0, duration: 200 });
     setProgressMessage('Loading');
-    setEta(null);
-    loadStartRef.current = Date.now();
+    setRemaining('');
     lastTickRef.current = null;
     let es;
     let cancelled = false;
@@ -84,6 +81,7 @@ export default function ImageEditor() {
           const p = data.progress ?? 0;
           setProgress(p);
           if (data.message) setProgressMessage(data.message);
+          setRemaining(data.remaining ?? '');
 
           const now = Date.now();
           const last = lastTickRef.current;
@@ -95,11 +93,6 @@ export default function ImageEditor() {
             setProgressBar({ target: p, duration: 200 });
           }
           lastTickRef.current = { p, t: now };
-
-          if (p > 0.05 && loadStartRef.current) {
-            const elapsed = (Date.now() - loadStartRef.current) / 1000;
-            setEta(Math.max(0, Math.round(elapsed * (1 - p) / p)));
-          }
         } catch {}
       };
     })();
@@ -399,8 +392,8 @@ export default function ImageEditor() {
               <span className="relative flex h-full items-center justify-center gap-2">
                 {isLoading && <DotmSquare4 size={16} dotSize={2} />}
                 {isLoading ? (progressMessage || 'Loading') : 'Run'}
-                {isLoading && eta != null && (
-                  <span className="opacity-70">· {eta >= 60 ? `${Math.floor(eta / 60)}m ${eta % 60}s` : `${eta}s`} left</span>
+                {isLoading && remaining && (
+                  <span className="opacity-70">· {remaining} left</span>
                 )}
               </span>
             </button>

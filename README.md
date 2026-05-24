@@ -22,7 +22,7 @@ cd frontend && npm run dev
 - [ ] estimation du temps
 - [ ] dark theme ?
 - [ ] mettre quelque chose qui agrandit l'image d'input
-- [ ] cliquer sur l'image devrait l'agrandir
+- [ ] on doit avoir un cue on hover pour indiquer qu'on peut widen l'image
 
 ## Valider les changements
 

@@ -10,24 +10,35 @@ class Snapshot:
     message: str
     current: int
     total: int
+    remaining: str = ""
 
 
 class ProgressTracker:
     def __init__(self):
         self._lock = threading.Lock()
-        self._snapshot = Snapshot("", 0, 1)
+        self._snapshot = Snapshot("", 0, 1, "")
         self._listeners: list[tuple[asyncio.Queue, asyncio.AbstractEventLoop]] = []
 
-    def set(self, message: str, current: int, total: int) -> None:
-        snap = Snapshot(message, current, max(total, 1))
+    def set(self, message: str, current: int, total: int, remaining: str = "") -> None:
+        snap = Snapshot(message, current, max(total, 1), remaining)
         with self._lock:
             self._snapshot = snap
             listeners = list(self._listeners)
         for queue, loop in listeners:
             loop.call_soon_threadsafe(queue.put_nowait, snap)
 
+    def set_from_tqdm(self, t: tqdm) -> None:
+        fd = t.format_dict
+        n = fd.get("n") or 0
+        total = fd.get("total") or 1
+        rate = fd.get("rate")
+        remaining = ""
+        if rate and rate > 0 and total and n < total:
+            remaining = tqdm.format_interval((total - n) / rate)
+        self.set(t.desc or "", n, total, remaining)
+
     def clear(self) -> None:
-        self.set("", 0, 1)
+        self.set("", 0, 1, "")
 
     def snapshot(self) -> Snapshot:
         with self._lock:
@@ -57,6 +68,7 @@ def ptqdm(iterable, message: str, total: int | None = None):
             total = None
     denom = total if total else 1
     tracker.set(message, 0, denom)
-    for i, item in enumerate(tqdm(iterable, total=total, desc=message)):
+    t = tqdm(iterable, total=total, desc=message)
+    for item in t:
         yield item
-        tracker.set(message, i + 1, denom)
+        tracker.set_from_tqdm(t)

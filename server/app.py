@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from PIL import Image
+from tqdm import tqdm
 
 from model_registry import ModelRegistry
 from progress import tracker
@@ -75,6 +76,7 @@ async def progress():
                 payload = {
                     "message": snap.message,
                     "progress": snap.current / snap.total,
+                    "remaining": snap.remaining,
                 }
                 yield f"data: {json.dumps(payload)}\n\n"
         finally:
@@ -187,11 +189,13 @@ async def flux2klein(
     print(f"flux2klein: prompt={prompt!r}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}")
 
     tracker.set("Generating", 0, num_inference_steps)
+    t = tqdm(total=num_inference_steps, desc="Generating")
 
     def _run():
         generator = registry.acquire('flux2klein')
         def on_step(_pipe, step_index, _timestep, kwargs):
-            tracker.set("Generating", step_index + 1, num_inference_steps)
+            t.update(1)
+            tracker.set_from_tqdm(t)
             return kwargs
         return generator(
             image=pil_image,
@@ -203,6 +207,7 @@ async def flux2klein(
     try:
         edited = await run_in_threadpool(_run)
     finally:
+        t.close()
         tracker.clear()
 
     buf = io.BytesIO()
