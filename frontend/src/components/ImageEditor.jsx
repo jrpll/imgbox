@@ -50,6 +50,10 @@ export default function ImageEditor() {
   const [lightbox, setLightbox] = useState(null);
   const [databaseOpen, setDatabaseOpen] = useState(false);
   const [databaseRows, setDatabaseRows] = useState(null);
+  const [selectedRowId, setSelectedRowId] = useState(null);
+  const [matchResult, setMatchResult] = useState(null);
+  const [matchIndex, setMatchIndex] = useState(0);
+  const [matchingId, setMatchingId] = useState(null);
 
   const t = useMemo(() => (key, params) => translate(key, lang, params), [lang]);
   const handleLangChange = (l) => {
@@ -83,8 +87,18 @@ export default function ImageEditor() {
     }
   };
 
-  const handleMatchIdentity = (id) => {
-    console.log('match', id);
+  const handleMatchIdentity = async (id) => {
+    setMatchingId(id);
+    try {
+      const matches = await apiGet(`/identity/match/${id}?k=20`);
+      const query = databaseRows?.find(r => r.id === id) || { id };
+      setMatchIndex(0);
+      setMatchResult({ query, matches });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setMatchingId(null);
+    }
   };
 
   useEffect(() => {
@@ -406,29 +420,45 @@ export default function ImageEditor() {
                   const gender = row.gender === 0 ? 'F' : row.gender === 1 ? 'M' : '—';
                   const date = row.created_at ? row.created_at.slice(0, 10) : '—';
                   const filename = (row.source_filename || '').split(/[\\/]/).pop();
+                  const selected = selectedRowId === row.id;
                   return (
                     <div
                       key={row.id}
-                      onClick={() => handleMatchIdentity(row.id)}
-                      className="flex items-center gap-4 px-5 py-2 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setSelectedRowId(selected ? null : row.id)}
+                      className={`relative px-5 py-2 cursor-pointer ${selected ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
                     >
-                      <img
-                        src={url}
-                        onClick={(e) => { e.stopPropagation(); setLightbox(url); }}
-                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        className="w-10 h-10 object-cover rounded cursor-zoom-in bg-gray-100 flex-shrink-0"
-                      />
-                      <div className="w-48 min-w-0 text-sm text-gray-700 truncate" title={filename}>{filename}</div>
-                      <div className="text-xs text-gray-400 w-24">{date}</div>
-                      <div className="text-xs text-gray-400 w-16">{gender}</div>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteIdentity(row.id); }}
-                        className="group ml-auto p-1 text-red-500 hover:text-red-600 transition-colors"
-                      >
-                        <Trash size={16} className="block group-hover:hidden" />
-                        <Trash size={16} weight="fill" className="hidden group-hover:block" />
-                      </button>
+                      <div className="flex items-center gap-4">
+                        <img
+                          src={url}
+                          onClick={(e) => { e.stopPropagation(); setLightbox(url); }}
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          className="w-10 h-10 object-cover rounded cursor-zoom-in bg-gray-100 flex-shrink-0"
+                        />
+                        <div className="w-48 min-w-0 text-sm text-gray-700 truncate" title={filename}>{filename}</div>
+                        <div className="text-xs text-gray-400 w-24">{date}</div>
+                        <div className="text-xs text-gray-400 w-16">{gender}</div>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteIdentity(row.id); }}
+                          className="group ml-auto p-1 text-red-500 hover:text-red-600 transition-colors"
+                        >
+                          <Trash size={16} className="block group-hover:hidden" />
+                          <Trash size={16} weight="fill" className="hidden group-hover:block" />
+                        </button>
+                      </div>
+                      {selected && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <button
+                            type="button"
+                            disabled={matchingId === row.id}
+                            onClick={(e) => { e.stopPropagation(); handleMatchIdentity(row.id); }}
+                            className="flex items-center gap-2 px-4 py-1.5 text-sm font-medium bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 transition-colors disabled:cursor-wait"
+                          >
+                            {matchingId === row.id && <DotmSquare4 size={14} dotSize={2} />}
+                            {t('common.match')}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -646,6 +676,71 @@ export default function ImageEditor() {
       </div>
 
       {/* Settings panel */}
+
+      {/* match results overlay */}
+      {matchResult && (() => {
+        const total = matchResult.matches.length;
+        const m = total > 0 ? matchResult.matches[matchIndex] : null;
+        return (
+          <div
+            onClick={() => setMatchResult(null)}
+            className="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-8 cursor-pointer"
+          >
+            <div onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-lg p-6 max-w-3xl w-full cursor-default">
+              <button
+                type="button"
+                onClick={() => setMatchResult(null)}
+                className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+              <div className="flex gap-6 justify-center items-start">
+                <div className="flex flex-col items-center gap-2">
+                  <img
+                    src={`/identity/crop/${matchResult.query.id}`}
+                    onClick={() => setLightbox(`/identity/crop/${matchResult.query.id}`)}
+                    className="w-40 h-40 object-cover rounded cursor-zoom-in bg-gray-100"
+                  />
+                  <span className="text-xs text-gray-500">query</span>
+                </div>
+                {m ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <img
+                      src={`/identity/crop/${m.id}`}
+                      onClick={() => setLightbox(`/identity/crop/${m.id}`)}
+                      className="w-40 h-40 object-cover rounded cursor-zoom-in bg-gray-100"
+                    />
+                    <span className="text-xs text-gray-500">
+                      {typeof m._distance === 'number' ? `d = ${m._distance.toFixed(3)}` : ''}
+                    </span>
+                    <div className="flex items-center gap-1 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setMatchIndex(i => Math.max(0, i - 1))}
+                        disabled={matchIndex === 0}
+                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ArrowLeft size={15} />
+                      </button>
+                      <span className="text-xs text-gray-400 tabular-nums w-12 text-center">{matchIndex + 1} / {total}</span>
+                      <button
+                        type="button"
+                        onClick={() => setMatchIndex(i => Math.min(total - 1, i + 1))}
+                        disabled={matchIndex === total - 1}
+                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ArrowRight size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-gray-400 text-sm">{t('common.empty_database')}</div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* lightbox */}
       {lightbox && (

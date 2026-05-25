@@ -303,6 +303,11 @@ async def identity_delete(id_: str):
     return {"ok": True}
 
 
+@app.get("/identity/match/{id_}")
+async def identity_match(id_: str, k: int = 2):
+    return identity_store.find_similar(id_, k)
+
+
 @app.post("/remove-background")
 async def remove_background(image: UploadFile = File(...)):
     contents = await image.read()

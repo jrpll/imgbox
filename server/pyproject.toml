@@ -26,4 +26,5 @@ dependencies = [
     "transformers>=4.51,<5",
     "uvicorn[standard]>=0.42.0",
     "pandas>=3.0.3",
+    "pylance>=6.0.1",
 ]

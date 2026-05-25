@@ -115,18 +115,14 @@ def insert(*, image_bytes: bytes, source_filename: str, model_name: str, embed_r
     return id_, was_new
 
 
+_LIGHT_COLS = [f.name for f in SCHEMA if f.name not in ("embedding", "kps")]
+
+
 def list_all() -> list[dict]:
     """Return all rows, excluding heavy fields (embedding, kps)."""
-    table = _table()
-    df = table.to_pandas()
-    if df.empty:
-        return []
-    cols = [c for c in df.columns if c not in ("embedding", "kps")]
-    out = []
-    for row in df[cols].to_dict(orient="records"):
-        out.append({k: (v.tolist() if hasattr(v, "tolist") else v) for k, v in row.items()})
-    out.sort(key=lambda r: r.get("created_at", ""), reverse=True)
-    return out
+    rows = _table().to_lance().to_table(columns=_LIGHT_COLS).to_pylist()
+    rows.sort(key=lambda r: r.get("created_at") or "", reverse=True)
+    return rows
 
 
 def crop_path(id_: str) -> Path | None:
@@ -138,6 +134,27 @@ def original_path(id_: str) -> Path | None:
     for f in ORIGINALS.glob(f"{id_}.*"):
         return f
     return None
+
+
+def find_similar(id_: str, k: int = 2) -> list[dict]:
+    """Top-k nearest identities by embedding distance, excluding self.
+
+    Returns rows with the same shape as list_all() plus a `_distance` field.
+    """
+    table = _table()
+    arrow = table.to_lance().to_table(filter=f"id = '{id_}'", columns=["embedding"])
+    if arrow.num_rows == 0:
+        return []
+    query_vec = arrow["embedding"][0].as_py()
+
+    return (
+        table.search(query_vec, vector_column_name="embedding")
+        .where(f"id != '{id_}'")
+        .select(_LIGHT_COLS)
+        .limit(k)
+        .to_arrow()
+        .to_pylist()
+    )
 
 
 def delete(id_: str) -> bool:
