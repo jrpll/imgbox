@@ -705,7 +705,6 @@ export default function ImageEditor() {
         const filename = (seeRow.source_filename || '').split(/[\\/]/).pop() || '—';
         const date = seeRow.created_at ? seeRow.created_at.slice(0, 10) : '—';
         const gender = seeRow.gender === 0 ? 'F' : seeRow.gender === 1 ? 'M' : '—';
-        const age = typeof seeRow.age === 'number' && seeRow.age >= 0 ? seeRow.age : '—';
         return (
           <div
             onClick={() => setSeeRow(null)}
@@ -734,15 +733,9 @@ export default function ImageEditor() {
                     <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.date')}</div>
                     <div className="text-sm text-gray-700">{date}</div>
                   </div>
-                  <div className="flex gap-6">
-                    <div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.gender')}</div>
-                      <div className="text-sm text-gray-700">{gender}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-gray-400 uppercase tracking-wide">age</div>
-                      <div className="text-sm text-gray-700">{age}</div>
-                    </div>
+                  <div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.gender')}</div>
+                    <div className="text-sm text-gray-700">{gender}</div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.caption')}</div>
