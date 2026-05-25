@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { LANGS, LangContext, translate } from '../lib/i18n';
-import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight, Trash } from '@phosphor-icons/react';
+import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight, Trash, Eye, Intersect } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
 import { apiPost, apiGet, apiDelete, apiEventSource } from '../lib/api';
 import { loadState, saveState, clearState } from '../lib/persist';
@@ -54,6 +54,7 @@ export default function ImageEditor() {
   const [matchResult, setMatchResult] = useState(null);
   const [matchIndex, setMatchIndex] = useState(0);
   const [matchingId, setMatchingId] = useState(null);
+  const [seeRow, setSeeRow] = useState(null);
 
   const t = useMemo(() => (key, params) => translate(key, lang, params), [lang]);
   const handleLangChange = (l) => {
@@ -425,7 +426,7 @@ export default function ImageEditor() {
                 {t('common.empty_database')}
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div>
                 {databaseRows.map(row => {
                   const url = `/identity/crop/${row.id}`;
                   const gender = row.gender === 0 ? 'F' : row.gender === 1 ? 'M' : '—';
@@ -436,7 +437,7 @@ export default function ImageEditor() {
                     <div
                       key={row.id}
                       onClick={() => setSelectedRowId(selected ? null : row.id)}
-                      className={`relative px-5 py-2 cursor-pointer ${selected ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+                      className={`relative px-5 py-2 border-b border-gray-100 cursor-pointer ${selected ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-16 flex-shrink-0">
@@ -451,25 +452,33 @@ export default function ImageEditor() {
                         <div className="text-xs text-gray-400 w-24">{date}</div>
                         <div className="text-xs text-gray-400 w-16">{gender}</div>
                         <div className="flex-1 min-w-0 text-xs text-gray-400 truncate" title={row.caption || ''}>{row.caption || '—'}</div>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); handleDeleteIdentity(row.id); }}
-                          className="group p-1 text-red-500 hover:text-red-600 transition-colors"
-                        >
-                          <Trash size={16} className="block group-hover:hidden" />
-                          <Trash size={16} weight="fill" className="hidden group-hover:block" />
-                        </button>
                       </div>
                       {selected && (
-                        <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2">
                           <button
                             type="button"
+                            title={t('common.see')}
+                            onClick={(e) => { e.stopPropagation(); setSeeRow(row); }}
+                            className="pointer-events-auto p-1.5 bg-white border border-gray-300 text-gray-600 rounded shadow-sm hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            title={t('common.match')}
                             disabled={matchingId === row.id}
                             onClick={(e) => { e.stopPropagation(); handleMatchIdentity(row.id); }}
-                            className="flex items-center gap-2 px-4 py-1.5 text-sm font-medium bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 transition-colors disabled:cursor-wait"
+                            className="pointer-events-auto p-1.5 bg-white border border-gray-300 text-gray-600 rounded shadow-sm hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors disabled:cursor-wait"
                           >
-                            {matchingId === row.id && <DotmSquare4 size={14} dotSize={2} />}
-                            {t('common.match')}
+                            <Intersect size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            title={t('common.delete')}
+                            onClick={(e) => { e.stopPropagation(); handleDeleteIdentity(row.id); }}
+                            className="pointer-events-auto p-1.5 bg-white border border-red-300 text-red-500 rounded shadow-sm hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
+                          >
+                            <Trash size={16} />
                           </button>
                         </div>
                       )}
@@ -690,6 +699,61 @@ export default function ImageEditor() {
       </div>
 
       {/* Settings panel */}
+
+      {/* see detail overlay */}
+      {seeRow && (() => {
+        const filename = (seeRow.source_filename || '').split(/[\\/]/).pop() || '—';
+        const date = seeRow.created_at ? seeRow.created_at.slice(0, 10) : '—';
+        const gender = seeRow.gender === 0 ? 'F' : seeRow.gender === 1 ? 'M' : '—';
+        const age = typeof seeRow.age === 'number' && seeRow.age >= 0 ? seeRow.age : '—';
+        return (
+          <div
+            onClick={() => setSeeRow(null)}
+            className="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-8 cursor-pointer"
+          >
+            <div onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-lg p-6 max-w-2xl w-full cursor-default">
+              <button
+                type="button"
+                onClick={() => setSeeRow(null)}
+                className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+              <div className="flex gap-6">
+                <img
+                  src={`/identity/crop/${seeRow.id}`}
+                  onClick={() => setLightbox(`/identity/crop/${seeRow.id}`)}
+                  className="w-64 h-64 object-cover rounded cursor-zoom-in bg-gray-100 flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0 flex flex-col gap-3 pt-1">
+                  <div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.filename')}</div>
+                    <div className="text-sm text-gray-700 break-all">{filename}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.date')}</div>
+                    <div className="text-sm text-gray-700">{date}</div>
+                  </div>
+                  <div className="flex gap-6">
+                    <div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.gender')}</div>
+                      <div className="text-sm text-gray-700">{gender}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400 uppercase tracking-wide">age</div>
+                      <div className="text-sm text-gray-700">{age}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.caption')}</div>
+                    <div className="text-sm text-gray-700 whitespace-pre-wrap break-words">{seeRow.caption || '—'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* match results overlay */}
       {matchResult && (() => {
