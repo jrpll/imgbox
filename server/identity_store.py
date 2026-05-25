@@ -50,6 +50,7 @@ SCHEMA = pa.schema([
     pa.field("created_at", pa.string()),
     pa.field("model_name", pa.string()),
     pa.field("original_ext", pa.string()),
+    pa.field("caption", pa.string()),
 ])
 
 _db = lancedb.connect(str(DB_PATH))
@@ -57,9 +58,15 @@ _db = lancedb.connect(str(DB_PATH))
 
 def _table():
     try:
-        return _db.open_table("identities")
+        t = _db.open_table("identities")
     except (FileNotFoundError, ValueError):
         return _db.create_table("identities", schema=SCHEMA)
+    if "caption" not in t.schema.names:
+        try:
+            t.add_columns({"caption": "''"})
+        except Exception as e:
+            print(f"identity_store: failed to add 'caption' column: {e}")
+    return t
 
 
 def _row_exists(table, id_: str) -> bool:
@@ -69,7 +76,7 @@ def _row_exists(table, id_: str) -> bool:
         return False
 
 
-def insert(*, image_bytes: bytes, source_filename: str, model_name: str, embed_result: dict) -> tuple[str, bool]:
+def insert(*, image_bytes: bytes, source_filename: str, model_name: str, embed_result: dict, caption: str = "") -> tuple[str, bool]:
     """Insert (or repair) one identity row. Returns (id, was_new).
 
     Idempotent: checks each artifact (original, crop, DB row) independently and
@@ -109,6 +116,7 @@ def insert(*, image_bytes: bytes, source_filename: str, model_name: str, embed_r
             "created_at": _exif_taken_at(image_bytes) or "",
             "model_name": model_name,
             "original_ext": ext,
+            "caption": caption,
         }
         table.add([row])
 

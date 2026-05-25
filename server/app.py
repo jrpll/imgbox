@@ -227,7 +227,7 @@ async def flux2klein(
     return StreamingResponse(buf, media_type="image/jpeg")
 
 @app.post("/identity")
-async def identity(images: list[UploadFile] = File(...)):
+async def identity(images: list[UploadFile] = File(...), caption: str = Form("")):
     processed = 0
     faces_found = 0
     skipped = 0
@@ -256,6 +256,7 @@ async def identity(images: list[UploadFile] = File(...)):
                     source_filename=upload.filename or "img",
                     model_name=model.name,
                     embed_result=result,
+                    caption=caption,
                 )
                 ids.append(id_)
                 faces_found += 1

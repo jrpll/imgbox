@@ -1,13 +1,41 @@
-import { User } from '@phosphor-icons/react';
+import { User, X } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
 
-async function submit({ images }) {
+const initialState = { caption: '' };
+
+function Inputs({ state, setState }) {
+  const { t } = useLang();
+  const set = (patch) => setState((s) => ({ ...s, ...patch }));
+  return (
+    <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+      <div className="group flex flex-col gap-1">
+        <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('common.caption')}</span>
+        <div className="relative">
+          <textarea
+            value={state.caption}
+            onChange={(e) => set({ caption: e.target.value })}
+            rows={3}
+            className="input-textarea"
+          />
+          {state.caption && (
+            <button type="button" onClick={() => set({ caption: '' })} className="input-clear-btn">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function submit({ images, state }) {
   const fd = new FormData();
   for (const img of images) fd.append('images', img);
+  if (state?.caption) fd.append('caption', state.caption);
   const r = await apiPost('/identity', fd);
   const data = await r.json();
-  return { state: {}, meta: data };
+  return { state, meta: data };
 }
 
 function Result({ meta, onZoom }) {
@@ -46,8 +74,8 @@ function Result({ meta, onZoom }) {
 export default {
   label: 'mode.identity',
   maxImages: 'unlimited',
-  initialState: {},
-  Inputs: () => null,
+  initialState,
+  Inputs,
   Result,
   submit,
   canSubmit: ({ images }) => images.length > 0,

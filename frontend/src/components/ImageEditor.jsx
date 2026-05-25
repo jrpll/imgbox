@@ -408,7 +408,8 @@ export default function ImageEditor() {
             <div className="w-48 min-w-0">{t('common.filename')}</div>
             <div className="w-24">{t('common.date')}</div>
             <div className="w-16">{t('common.gender')}</div>
-            <div className="ml-auto w-6" />
+            <div className="flex-1 min-w-0">{t('common.caption')}</div>
+            <div className="w-6" />
           </div>
           <div className="flex-1 overflow-y-auto bg-white">
             {databaseRows === null ? (
@@ -445,10 +446,11 @@ export default function ImageEditor() {
                         <div className="w-48 min-w-0 text-sm text-gray-700 truncate" title={filename}>{filename}</div>
                         <div className="text-xs text-gray-400 w-24">{date}</div>
                         <div className="text-xs text-gray-400 w-16">{gender}</div>
+                        <div className="flex-1 min-w-0 text-xs text-gray-400 truncate" title={row.caption || ''}>{row.caption || '—'}</div>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleDeleteIdentity(row.id); }}
-                          className="group ml-auto p-1 text-red-500 hover:text-red-600 transition-colors"
+                          className="group p-1 text-red-500 hover:text-red-600 transition-colors"
                         >
                           <Trash size={16} className="block group-hover:hidden" />
                           <Trash size={16} weight="fill" className="hidden group-hover:block" />
