@@ -268,7 +268,7 @@ export default function ImageEditor() {
             className="flex items-center gap-2 px-4 py-1.5 text-base font-normal leading-none border border-gray-300 rounded hover:bg-gray-50 transition-colors min-w-[180px] justify-between"
             style={{ textBox: 'trim-both cap alphabetic' }}
           >
-            {databaseOpen ? t('common.database') : t(modeConfig.label)}
+            {t(modeConfig.label)}
             <CaretDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
           </button>
           {menuOpen && (
@@ -282,27 +282,30 @@ export default function ImageEditor() {
                   {t(cfg.label)}
                 </button>
               ))}
-              <div className="border-t border-gray-100 my-1" />
-              <button
-                onClick={async () => {
-                  setMenuOpen(false);
-                  setDatabaseOpen(true);
-                  setDatabaseRows(null);
-                  try {
-                    const rows = await apiGet('/identity/list');
-                    setDatabaseRows(rows);
-                  } catch (e) {
-                    console.error(e);
-                    setDatabaseRows([]);
-                  }
-                }}
-                className={`w-full text-left px-4 py-2 text-base font-normal transition-colors ${databaseOpen ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
-              >
-                {t('common.database')}
-              </button>
             </div>
           )}
         </div>
+        <button
+          onClick={async () => {
+            if (databaseOpen) {
+              setDatabaseOpen(false);
+              return;
+            }
+            setDatabaseOpen(true);
+            setDatabaseRows(null);
+            try {
+              const rows = await apiGet('/identity/list');
+              setDatabaseRows(rows);
+            } catch (e) {
+              console.error(e);
+              setDatabaseRows([]);
+            }
+          }}
+          className={`px-4 py-1.5 text-base font-normal leading-none border border-gray-300 rounded transition-colors ${databaseOpen ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+          style={{ textBox: 'trim-both cap alphabetic' }}
+        >
+          {t('common.database')}
+        </button>
         <div className="ml-auto self-center" onMouseEnter={() => setSettingsOpen(true)} onMouseLeave={() => setSettingsOpen(false)}>
           <button className="p-1.5 text-black hover:text-gray-500 transition-colors">
             <SidebarSimple size={20} mirrored />
@@ -373,7 +376,7 @@ export default function ImageEditor() {
               {databaseRows && databaseRows.length > 0 && <span className="text-gray-400 font-normal"> · {databaseRows.length}</span>}
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-5 bg-gray-50">
+          <div className="flex-1 overflow-y-auto bg-white">
             {databaseRows === null ? (
               <div className="flex items-center justify-center h-full text-gray-300">
                 <DotmSquare4 size={24} dotSize={3} />
@@ -383,23 +386,23 @@ export default function ImageEditor() {
                 {t('common.empty_database')}
               </div>
             ) : (
-              <div className="grid grid-cols-6 gap-3">
+              <div className="divide-y divide-gray-100">
                 {databaseRows.map(row => {
                   const url = `/identity/crop/${row.id}`;
                   const gender = row.gender === 0 ? 'F' : row.gender === 1 ? 'M' : '—';
                   const conf = typeof row.det_score === 'number' ? row.det_score.toFixed(2) : '—';
                   const date = (row.created_at || '').slice(0, 10);
                   return (
-                    <div key={row.id} className="flex flex-col gap-1">
+                    <div key={row.id} className="flex items-center gap-4 px-5 py-2 hover:bg-gray-50">
                       <img
                         src={url}
                         onClick={() => setLightbox(url)}
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                        className="w-full aspect-square object-cover rounded cursor-zoom-in bg-gray-100"
+                        className="w-10 h-10 object-cover rounded cursor-zoom-in bg-gray-100 flex-shrink-0"
                       />
-                      <div className="text-xs text-gray-700 truncate" title={row.source_filename}>{row.source_filename}</div>
-                      <div className="text-[11px] text-gray-400">{gender} · {row.age >= 0 ? row.age : '—'} · {conf}</div>
-                      <div className="text-[11px] text-gray-300">{date}</div>
+                      <div className="flex-1 min-w-0 text-sm text-gray-700 truncate" title={row.source_filename}>{row.source_filename}</div>
+                      <div className="text-xs text-gray-400 w-24 text-right">{gender} · {row.age >= 0 ? row.age : '—'} · {conf}</div>
+                      <div className="text-xs text-gray-300 w-24 text-right">{date}</div>
                     </div>
                   );
                 })}
