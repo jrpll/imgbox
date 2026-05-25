@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import datetime
 import io
 import json
 import os
@@ -12,6 +13,19 @@ from fastapi.concurrency import run_in_threadpool
 from PIL import Image
 from pillow_heif import register_heif_opener
 from tqdm import tqdm
+
+
+def _save_with_exif(image: Image.Image, fmt: str, **save_kwargs) -> io.BytesIO:
+    """Save image with imgbox EXIF: Software + DateTime + DateTimeOriginal=now."""
+    now = datetime.datetime.now().strftime("%Y:%m:%d %H:%M:%S")
+    exif = Image.Exif()
+    exif[0x0131] = "imgbox"   # Software (0th IFD)
+    exif[0x0132] = now        # DateTime (0th IFD)
+    exif.get_ifd(0x8769)[0x9003] = now  # DateTimeOriginal (Exif sub-IFD)
+    buf = io.BytesIO()
+    image.save(buf, fmt, exif=exif.tobytes(), **save_kwargs)
+    buf.seek(0)
+    return buf
 
 register_heif_opener()
 
@@ -136,9 +150,7 @@ async def generate(
     finally:
         tracker.clear()
 
-    buf = io.BytesIO()
-    edited.save(buf, "JPEG")
-    buf.seek(0)
+    buf = _save_with_exif(edited, "JPEG")
     return StreamingResponse(buf, media_type="image/jpeg")
 
 
@@ -170,9 +182,7 @@ async def edit(
     finally:
         tracker.clear()
 
-    buf = io.BytesIO()
-    edited.save(buf, "JPEG")
-    buf.seek(0)
+    buf = _save_with_exif(edited, "JPEG")
     return StreamingResponse(buf, media_type="image/jpeg")
 
 @app.post("/flux2klein")
@@ -213,9 +223,7 @@ async def flux2klein(
         t.close()
         tracker.clear()
 
-    buf = io.BytesIO()
-    edited.save(buf, "JPEG")
-    buf.seek(0)
+    buf = _save_with_exif(edited, "JPEG")
     return StreamingResponse(buf, media_type="image/jpeg")
 
 @app.post("/identity")
@@ -288,6 +296,13 @@ async def identity_original(id_: str):
     return FileResponse(p)
 
 
+@app.delete("/identity/{id_}")
+async def identity_delete(id_: str):
+    if not identity_store.delete(id_):
+        raise HTTPException(status_code=404)
+    return {"ok": True}
+
+
 @app.post("/remove-background")
 async def remove_background(image: UploadFile = File(...)):
     contents = await image.read()
@@ -300,9 +315,7 @@ async def remove_background(image: UploadFile = File(...)):
         return model(pil_image)
     
     pil_image = await run_in_threadpool(_run)
-    buf = io.BytesIO()
-    pil_image.save(buf, "png")
-    buf.seek(0)
+    buf = _save_with_exif(pil_image, "PNG")
     return StreamingResponse(buf, media_type="image/png")
 
 # ---------------------------------------------------------------------------

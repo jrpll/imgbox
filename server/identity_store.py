@@ -6,6 +6,27 @@ from pathlib import Path
 
 import lancedb
 import pyarrow as pa
+from PIL import Image, ExifTags
+
+_DATETIME_ORIGINAL = next((k for k, v in ExifTags.TAGS.items() if v == "DateTimeOriginal"), None)
+_DATETIME = next((k for k, v in ExifTags.TAGS.items() if v == "DateTime"), None)
+
+
+def _exif_taken_at(image_bytes: bytes) -> str | None:
+    """Extract EXIF DateTimeOriginal (or DateTime) as ISO string, or None."""
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as im:
+            exif = im.getexif()
+            # DateTimeOriginal lives in the Exif sub-IFD (pointer tag 0x8769)
+            sub = exif.get_ifd(0x8769)
+            raw = sub.get(_DATETIME_ORIGINAL) or exif.get(_DATETIME_ORIGINAL) or exif.get(_DATETIME)
+        if not raw:
+            return None
+        # EXIF format: "YYYY:MM:DD HH:MM:SS"
+        dt = datetime.datetime.strptime(raw.strip(), "%Y:%m:%d %H:%M:%S")
+        return dt.isoformat()
+    except Exception:
+        return None
 
 DATA_ROOT = Path(os.path.expanduser("~/.imgbox/identity"))
 DB_PATH = DATA_ROOT / "db"
@@ -85,7 +106,7 @@ def insert(*, image_bytes: bytes, source_filename: str, model_name: str, embed_r
             "source_filename": source_filename,
             "width": embed_result["width"],
             "height": embed_result["height"],
-            "created_at": datetime.datetime.utcnow().isoformat(),
+            "created_at": _exif_taken_at(image_bytes) or "",
             "model_name": model_name,
             "original_ext": ext,
         }
@@ -117,3 +138,19 @@ def original_path(id_: str) -> Path | None:
     for f in ORIGINALS.glob(f"{id_}.*"):
         return f
     return None
+
+
+def delete(id_: str) -> bool:
+    """Remove the DB row + original + crop. Returns True if anything existed."""
+    table = _table()
+    existed = _row_exists(table, id_)
+    if existed:
+        table.delete(f"id = '{id_}'")
+    crop_p = CROPS / f"{id_}.jpg"
+    if crop_p.exists():
+        crop_p.unlink()
+        existed = True
+    for f in ORIGINALS.glob(f"{id_}.*"):
+        f.unlink()
+        existed = True
+    return existed

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { LANGS, LangContext, translate } from '../lib/i18n';
-import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight } from '@phosphor-icons/react';
+import { Upload, X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight, Trash } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
-import { apiPost, apiGet, apiEventSource } from '../lib/api';
+import { apiPost, apiGet, apiDelete, apiEventSource } from '../lib/api';
 import { loadState, saveState, clearState } from '../lib/persist';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
@@ -73,6 +73,19 @@ export default function ImageEditor() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleDeleteIdentity = async (id) => {
+    try {
+      await apiDelete(`/identity/${id}`);
+      setDatabaseRows(prev => prev ? prev.filter(r => r.id !== id) : prev);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleMatchIdentity = (id) => {
+    console.log('match', id);
+  };
 
   useEffect(() => {
     if (!isLoading) {
@@ -370,11 +383,12 @@ export default function ImageEditor() {
 
       {databaseOpen ? (
         <div className="flex-1 flex flex-col rounded border border-gray-200 overflow-hidden">
-          <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
-            <span className="font-semibold">
-              {t('common.database')}
-              {databaseRows && databaseRows.length > 0 && <span className="text-gray-400 font-normal"> · {databaseRows.length}</span>}
-            </span>
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-4 text-xs font-medium text-gray-400 uppercase tracking-wide">
+            <div className="w-10 flex-shrink-0">{t('common.picture')}</div>
+            <div className="w-48 min-w-0">{t('common.filename')}</div>
+            <div className="w-24">{t('common.date')}</div>
+            <div className="w-16">{t('common.gender')}</div>
+            <div className="ml-auto w-6" />
           </div>
           <div className="flex-1 overflow-y-auto bg-white">
             {databaseRows === null ? (
@@ -390,19 +404,31 @@ export default function ImageEditor() {
                 {databaseRows.map(row => {
                   const url = `/identity/crop/${row.id}`;
                   const gender = row.gender === 0 ? 'F' : row.gender === 1 ? 'M' : '—';
-                  const conf = typeof row.det_score === 'number' ? row.det_score.toFixed(2) : '—';
-                  const date = (row.created_at || '').slice(0, 10);
+                  const date = row.created_at ? row.created_at.slice(0, 10) : '—';
+                  const filename = (row.source_filename || '').split(/[\\/]/).pop();
                   return (
-                    <div key={row.id} className="flex items-center gap-4 px-5 py-2 hover:bg-gray-50">
+                    <div
+                      key={row.id}
+                      onClick={() => handleMatchIdentity(row.id)}
+                      className="flex items-center gap-4 px-5 py-2 hover:bg-gray-50 cursor-pointer"
+                    >
                       <img
                         src={url}
-                        onClick={() => setLightbox(url)}
+                        onClick={(e) => { e.stopPropagation(); setLightbox(url); }}
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         className="w-10 h-10 object-cover rounded cursor-zoom-in bg-gray-100 flex-shrink-0"
                       />
-                      <div className="flex-1 min-w-0 text-sm text-gray-700 truncate" title={row.source_filename}>{row.source_filename}</div>
-                      <div className="text-xs text-gray-400 w-24 text-right">{gender} · {row.age >= 0 ? row.age : '—'} · {conf}</div>
-                      <div className="text-xs text-gray-300 w-24 text-right">{date}</div>
+                      <div className="w-48 min-w-0 text-sm text-gray-700 truncate" title={filename}>{filename}</div>
+                      <div className="text-xs text-gray-400 w-24">{date}</div>
+                      <div className="text-xs text-gray-400 w-16">{gender}</div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteIdentity(row.id); }}
+                        className="group ml-auto p-1 text-red-500 hover:text-red-600 transition-colors"
+                      >
+                        <Trash size={16} className="block group-hover:hidden" />
+                        <Trash size={16} weight="fill" className="hidden group-hover:block" />
+                      </button>
                     </div>
                   );
                 })}

@@ -46,6 +46,16 @@ export async function apiGet(path) {
   return response.json();
 }
 
+export async function apiDelete(path) {
+  const base = await getBaseUrl();
+  const response = await fetch(`${base}${path}`, { method: 'DELETE' });
+  if (!response.ok) {
+    const text = await response.text().catch(() => response.statusText);
+    throw new Error(`${response.status}: ${text}`);
+  }
+  return response;
+}
+
 export async function apiEventSource(path) {
   const base = await getBaseUrl();
   return new EventSource(`${base}${path}`);
