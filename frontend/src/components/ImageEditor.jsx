@@ -99,11 +99,15 @@ export default function ImageEditor() {
   }, [databaseOpen]);
 
   const handleDeleteIdentity = async (id) => {
+    setDatabaseRows(prev => prev ? prev.filter(r => r.id !== id) : prev);
     try {
       await apiDelete(`/identity/${id}`);
-      setDatabaseRows(prev => prev ? prev.filter(r => r.id !== id) : prev);
     } catch (e) {
       console.error(e);
+      try {
+        const rows = await apiGet('/identity/list');
+        setDatabaseRows(rows);
+      } catch {}
     }
   };
 
