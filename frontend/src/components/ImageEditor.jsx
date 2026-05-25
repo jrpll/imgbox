@@ -48,7 +48,7 @@ export default function ImageEditor() {
     return saved && LANGS.includes(saved) ? saved : 'ENG';
   });
   const [lightbox, setLightbox] = useState(null);
-  const [databaseOpen, setDatabaseOpen] = useState(false);
+  const [databaseOpen, setDatabaseOpen] = useState(() => localStorage.getItem('imgbox:databaseOpen') === 'true');
   const [databaseRows, setDatabaseRows] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [matchResult, setMatchResult] = useState(null);
@@ -77,6 +77,26 @@ export default function ImageEditor() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('imgbox:databaseOpen', databaseOpen ? 'true' : 'false');
+    if (!databaseOpen) {
+      setSelectedRowId(null);
+      return;
+    }
+    let cancelled = false;
+    setDatabaseRows(null);
+    (async () => {
+      try {
+        const rows = await apiGet('/identity/list');
+        if (!cancelled) setDatabaseRows(rows);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setDatabaseRows([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [databaseOpen]);
 
   const handleDeleteIdentity = async (id) => {
     try {
@@ -313,21 +333,7 @@ export default function ImageEditor() {
           )}
         </div>
         <button
-          onClick={async () => {
-            if (databaseOpen) {
-              setDatabaseOpen(false);
-              return;
-            }
-            setDatabaseOpen(true);
-            setDatabaseRows(null);
-            try {
-              const rows = await apiGet('/identity/list');
-              setDatabaseRows(rows);
-            } catch (e) {
-              console.error(e);
-              setDatabaseRows([]);
-            }
-          }}
+          onClick={() => setDatabaseOpen(o => !o)}
           className={`px-4 py-1.5 text-base font-normal leading-none border border-gray-300 rounded transition-colors ${databaseOpen ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
           style={{ textBox: 'trim-both cap alphabetic' }}
         >
@@ -398,7 +404,7 @@ export default function ImageEditor() {
       {databaseOpen ? (
         <div className="flex-1 flex flex-col rounded border border-gray-200 overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-4 text-xs font-medium text-gray-400 uppercase tracking-wide">
-            <div className="w-10 flex-shrink-0">{t('common.picture')}</div>
+            <div className="w-16 flex-shrink-0">{t('common.picture')}</div>
             <div className="w-48 min-w-0">{t('common.filename')}</div>
             <div className="w-24">{t('common.date')}</div>
             <div className="w-16">{t('common.gender')}</div>
@@ -428,12 +434,14 @@ export default function ImageEditor() {
                       className={`relative px-5 py-2 cursor-pointer ${selected ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
                     >
                       <div className="flex items-center gap-4">
-                        <img
-                          src={url}
-                          onClick={(e) => { e.stopPropagation(); setLightbox(url); }}
-                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          className="w-10 h-10 object-cover rounded cursor-zoom-in bg-gray-100 flex-shrink-0"
-                        />
+                        <div className="w-16 flex-shrink-0">
+                          <img
+                            src={url}
+                            onClick={(e) => { e.stopPropagation(); setLightbox(url); }}
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            className="w-10 h-10 object-cover rounded cursor-zoom-in bg-gray-100"
+                          />
+                        </div>
                         <div className="w-48 min-w-0 text-sm text-gray-700 truncate" title={filename}>{filename}</div>
                         <div className="text-xs text-gray-400 w-24">{date}</div>
                         <div className="text-xs text-gray-400 w-16">{gender}</div>
@@ -681,12 +689,15 @@ export default function ImageEditor() {
       {matchResult && (() => {
         const total = matchResult.matches.length;
         const m = total > 0 ? matchResult.matches[matchIndex] : null;
+        const fmtName = (r) => (r?.source_filename || '').split(/[\\/]/).pop() || '—';
+        const fmtDate = (r) => r?.created_at ? r.created_at.slice(0, 10) : '—';
+        const fmtGender = (r) => r?.gender === 0 ? 'F' : r?.gender === 1 ? 'M' : '—';
         return (
           <div
             onClick={() => setMatchResult(null)}
             className="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-8 cursor-pointer"
           >
-            <div onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-lg p-6 max-w-3xl w-full cursor-default">
+            <div onClick={(e) => e.stopPropagation()} className="relative bg-white rounded-lg p-6 max-w-3xl w-full cursor-default flex flex-col items-center gap-4">
               <button
                 type="button"
                 onClick={() => setMatchResult(null)}
@@ -695,48 +706,50 @@ export default function ImageEditor() {
                 <X size={18} />
               </button>
               <div className="flex gap-6 justify-center items-start">
-                <div className="flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-1">
                   <img
                     src={`/identity/crop/${matchResult.query.id}`}
                     onClick={() => setLightbox(`/identity/crop/${matchResult.query.id}`)}
                     className="w-40 h-40 object-cover rounded cursor-zoom-in bg-gray-100"
                   />
-                  <span className="text-xs text-gray-500">query</span>
+                  <span className="text-xs text-gray-500 max-w-[160px] truncate" title={fmtName(matchResult.query)}>{fmtName(matchResult.query)}</span>
+                  <span className="text-[11px] text-gray-400">{fmtDate(matchResult.query)} · {fmtGender(matchResult.query)}</span>
                 </div>
                 {m ? (
-                  <div className="flex flex-col items-center gap-2">
+                  <div className="flex flex-col items-center gap-1">
                     <img
                       src={`/identity/crop/${m.id}`}
                       onClick={() => setLightbox(`/identity/crop/${m.id}`)}
                       className="w-40 h-40 object-cover rounded cursor-zoom-in bg-gray-100"
                     />
-                    <span className="text-xs text-gray-500">
-                      {typeof m._distance === 'number' ? `d = ${m._distance.toFixed(3)}` : ''}
-                    </span>
-                    <div className="flex items-center gap-1 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => setMatchIndex(i => Math.max(0, i - 1))}
-                        disabled={matchIndex === 0}
-                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <ArrowLeft size={15} />
-                      </button>
-                      <span className="text-xs text-gray-400 tabular-nums w-12 text-center">{matchIndex + 1} / {total}</span>
-                      <button
-                        type="button"
-                        onClick={() => setMatchIndex(i => Math.min(total - 1, i + 1))}
-                        disabled={matchIndex === total - 1}
-                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <ArrowRight size={15} />
-                      </button>
-                    </div>
+                    <span className="text-xs text-gray-500 max-w-[160px] truncate" title={fmtName(m)}>{fmtName(m)}</span>
+                    <span className="text-[11px] text-gray-400">{fmtDate(m)} · {fmtGender(m)}</span>
                   </div>
                 ) : (
                   <div className="flex items-center text-gray-400 text-sm">{t('common.empty_database')}</div>
                 )}
               </div>
+              {m && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMatchIndex(i => Math.max(0, i - 1))}
+                    disabled={matchIndex === 0}
+                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ArrowLeft size={15} />
+                  </button>
+                  <span className="text-xs text-gray-400 tabular-nums w-12 text-center">{matchIndex + 1} / {total}</span>
+                  <button
+                    type="button"
+                    onClick={() => setMatchIndex(i => Math.min(total - 1, i + 1))}
+                    disabled={matchIndex === total - 1}
+                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
