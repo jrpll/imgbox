@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.concurrency import run_in_threadpool
+import torch
 from PIL import Image
 from pillow_heif import register_heif_opener
 from tqdm import tqdm
@@ -191,6 +192,9 @@ async def flux2klein(
     prompt: str = Form(""),
     num_inference_steps: int = Form(100),
     diffusion_coefficient: float = Form(3),
+    seed: int | None = Form(None),
+    width: int | None = Form(None),
+    height: int | None = Form(None),
 ):
     pil_images = []
     if images:
@@ -199,23 +203,27 @@ async def flux2klein(
             pil_images.append(Image.open(io.BytesIO(contents)).convert("RGB"))
     pil_image = pil_images if pil_images else None
 
-    print(f"flux2klein: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}")
+    print(f"flux2klein: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}  seed={seed}  size={width}x{height}")
 
     tracker.set("Generating", 0, num_inference_steps)
     t = tqdm(total=num_inference_steps, desc="Generating")
 
     def _run():
-        generator = registry.acquire('flux2klein')
+        pipe = registry.acquire('flux2klein')
         def on_step(_pipe, step_index, _timestep, kwargs):
             t.update(1)
             tracker.set_from_tqdm(t)
             return kwargs
-        return generator(
+        torch_gen = torch.Generator().manual_seed(seed) if seed is not None else None
+        return pipe(
             image=pil_image,
             prompt=prompt,
             num_inference_steps=num_inference_steps,
             diffusion_norm=diffusion_coefficient,
             callback_on_step_end=on_step,
+            generator=torch_gen,
+            width=width,
+            height=height,
         ).images[0]
     try:
         edited = await run_in_threadpool(_run)

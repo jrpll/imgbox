@@ -188,7 +188,8 @@ export default function ImageEditor() {
       const saved = await loadState(mode);
       if (cancelled || !saved) return;
       const cfg = MODES[mode];
-      setModeState(cfg.restoreState ? cfg.restoreState(saved.modeState) : saved.modeState);
+      const merged = { ...cfg.initialState, ...(saved.modeState || {}) };
+      setModeState(cfg.restoreState ? cfg.restoreState(merged) : merged);
       const restored = saved.images ?? (saved.image ? [saved.image] : []);
       if (restored.length) setImages(restored);
       if (saved.result) setResult(URL.createObjectURL(saved.result));
@@ -457,28 +458,28 @@ export default function ImageEditor() {
                         <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2">
                           <button
                             type="button"
-                            title={t('common.see')}
                             onClick={(e) => { e.stopPropagation(); setSeeRow(row); }}
-                            className="pointer-events-auto p-1.5 bg-white border border-gray-300 text-gray-600 rounded shadow-sm hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
+                            className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 text-xs bg-white border border-gray-300 text-gray-600 rounded shadow-sm hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors"
                           >
-                            <Eye size={16} />
+                            <Eye size={14} />
+                            {t('common.view')}
                           </button>
                           <button
                             type="button"
-                            title={t('common.match')}
                             disabled={matchingId === row.id}
                             onClick={(e) => { e.stopPropagation(); handleMatchIdentity(row.id); }}
-                            className="pointer-events-auto p-1.5 bg-white border border-gray-300 text-gray-600 rounded shadow-sm hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors disabled:cursor-wait"
+                            className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 text-xs bg-white border border-gray-300 text-gray-600 rounded shadow-sm hover:bg-gray-800 hover:text-white hover:border-gray-800 transition-colors disabled:cursor-wait"
                           >
-                            <Intersect size={16} />
+                            <Intersect size={14} />
+                            {t('common.match')}
                           </button>
                           <button
                             type="button"
-                            title={t('common.delete')}
                             onClick={(e) => { e.stopPropagation(); handleDeleteIdentity(row.id); }}
-                            className="pointer-events-auto p-1.5 bg-white border border-red-300 text-red-500 rounded shadow-sm hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
+                            className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 text-xs bg-white border border-red-300 text-red-500 rounded shadow-sm hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors"
                           >
-                            <Trash size={16} />
+                            <Trash size={14} />
+                            {t('common.delete')}
                           </button>
                         </div>
                       )}

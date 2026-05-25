@@ -6,6 +6,9 @@ const initialState = {
   prompt: '',
   numInferenceSteps: '',
   diffusionCoefficient: '',
+  seed: '',
+  width: '',
+  height: '',
 };
 
 function Inputs({ state, setState }) {
@@ -54,6 +57,39 @@ function Inputs({ state, setState }) {
           />
         </div>
       </div>
+
+      <div className="flex gap-3">
+        <div className="group flex-1 flex flex-col gap-1">
+          <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('flux.seed')}</span>
+          <input
+            type="number"
+            placeholder="random"
+            value={state.seed}
+            onChange={(e) => set({ seed: e.target.value === '' ? '' : parseInt(e.target.value) })}
+            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 placeholder-gray-400"
+          />
+        </div>
+        <div className="group flex-1 flex flex-col gap-1">
+          <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('flux.width')}</span>
+          <input
+            type="number"
+            placeholder="1024"
+            value={state.width}
+            onChange={(e) => set({ width: e.target.value === '' ? '' : parseInt(e.target.value) })}
+            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 placeholder-gray-400"
+          />
+        </div>
+        <div className="group flex-1 flex flex-col gap-1">
+          <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('flux.height')}</span>
+          <input
+            type="number"
+            placeholder="1024"
+            value={state.height}
+            onChange={(e) => set({ height: e.target.value === '' ? '' : parseInt(e.target.value) })}
+            className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 placeholder-gray-400"
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -62,8 +98,11 @@ async function submit({ images, state }) {
   const fd = new FormData();
   for (const img of images) fd.append('images', img);
   fd.append('prompt', state.prompt);
-  if (state.numInferenceSteps !== '') fd.append('num_inference_steps', state.numInferenceSteps);
-  if (state.diffusionCoefficient !== '') fd.append('diffusion_coefficient', state.diffusionCoefficient);
+  if (Number.isInteger(state.numInferenceSteps)) fd.append('num_inference_steps', state.numInferenceSteps);
+  if (Number.isFinite(state.diffusionCoefficient)) fd.append('diffusion_coefficient', state.diffusionCoefficient);
+  if (Number.isInteger(state.seed)) fd.append('seed', state.seed);
+  if (Number.isInteger(state.width)) fd.append('width', state.width);
+  if (Number.isInteger(state.height)) fd.append('height', state.height);
   const r = await apiPost('/flux2klein', fd);
   return { blob: await r.blob(), state };
 }
