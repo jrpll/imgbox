@@ -74,6 +74,7 @@ function Result({ meta, onZoom }) {
 export default {
   label: 'mode.identity',
   maxImages: 'unlimited',
+  directoryPicker: true,
   initialState,
   Inputs,
   Result,

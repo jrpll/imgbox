@@ -602,7 +602,7 @@ export default function ImageEditor() {
               className="hidden"
               accept="image/*"
               multiple={isMulti}
-              {...(isMulti ? { webkitdirectory: '', directory: '' } : {})}
+              {...(modeConfig.directoryPicker ? { webkitdirectory: '', directory: '' } : {})}
               onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
             />
             </div>
