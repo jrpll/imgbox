@@ -543,7 +543,7 @@ export default function ImageEditor() {
               onDrop={handleDrop}
               className={`relative h-40 flex items-center justify-center rounded overflow-hidden transition-colors ${
                 isMulti || !images.length ? 'cursor-pointer' : ''
-              } ${isDragging ? 'bg-gray-100' : images.length ? '' : 'bg-gray-50'}`}
+              } ${isDragging ? 'bg-gray-100' : 'bg-gray-50'}`}
               style={{
                 backgroundImage: isDragging
                   ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%239ca3af' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
