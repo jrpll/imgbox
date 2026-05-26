@@ -8,7 +8,6 @@ import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
 import flux2KleinMode from './modes/Flux2Klein';
 import identityMode from './modes/Identity';
-import { DotmSquare4 } from './dotmatrix/dotm-square-4';
 
 const MODES = {
   'edit': editMode,
@@ -420,9 +419,7 @@ export default function ImageEditor() {
           </div>
           <div className="flex-1 overflow-y-auto bg-white">
             {databaseRows === null ? (
-              <div className="flex items-center justify-center h-full text-gray-300">
-                <DotmSquare4 size={24} dotSize={3} />
-              </div>
+              <div className="h-full" />
             ) : databaseRows.length === 0 ? (
               <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                 {t('common.empty_database')}
@@ -648,7 +645,6 @@ export default function ImageEditor() {
                 />
               )}
               <span className="relative flex h-full items-center justify-center gap-2">
-                {isLoading && <DotmSquare4 size={16} dotSize={2} />}
                 {isLoading ? t('progress.' + (progressMessage || 'Loading')) : t('common.run')}
                 {isLoading && remaining && (
                   <span className="opacity-70">· {remaining} {t('common.left')}</span>

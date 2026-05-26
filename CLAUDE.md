@@ -12,7 +12,6 @@ AI-powered image editing desktop app. User uploads an image, describes what it l
 | Desktop shell | Tauri v2 (Rust) |
 | Backend | FastAPI + Uvicorn (Python) |
 | ML | Stable Diffusion 3 Medium via HuggingFace Diffusers |
-| Loading spinner | Three.js WebGPU/TSL (falls back to WebGL2) |
 
 ---
 
@@ -42,13 +41,11 @@ frontend/src/
 │   ├── ImageEditor.jsx      # Two-card shell: header + mode dropdown,
 │   │                          shared image upload, mode dispatch, result viewer
 │   ├── Setup.jsx            # First-run HF token entry
-│   ├── ThreeSpinner.jsx     # WebGPU canvas spinner (shown while isLoading)
 │   └── modes/
 │       ├── Edit.jsx         # 'edit' mode: text1 + text2 + structure slider
 │       └── RemoveBackground.jsx  # 'remove background' mode (stub)
-├── lib/api.js               # Fetch wrapper — reads server URL from Tauri store
-│                            # or VITE_API_URL env, falls back to 127.0.0.1:8080
-└── spinners/spinner.js      # Three.js TSL hypotrochoid Points object
+└── lib/api.js               # Fetch wrapper — reads server URL from Tauri store
+                             # or VITE_API_URL env, falls back to 127.0.0.1:8080
 
 server/
 ├── app.py                   # FastAPI routes: /generate, /edit, /health
