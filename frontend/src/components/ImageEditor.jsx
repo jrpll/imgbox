@@ -246,7 +246,8 @@ export default function ImageEditor() {
       setModeState(newState ?? modeState);
       if (blob) setResult(URL.createObjectURL(blob));
       if (meta) setResultMeta(meta);
-      await saveState(mode, { modeState: newState ?? modeState, images, result: blob, meta });
+      saveState(mode, { modeState: newState ?? modeState, images, result: blob, meta })
+        .catch(err => console.error('saveState:', err));
     } catch (err) {
       console.error('Error:', err);
     } finally {
