@@ -27,13 +27,13 @@ uv run python app.py
 
 ## Todo
 
-- [ ] Ajouter clear cache option dans le panel de droite
-- [ ] Renommer les items dans le drop down "edit" -> "sd3 + gommette edit", ainsi que les routes
-- [ ] Mettre des pastilles i à côté des champs pour donner des indications
-- [ ] dark theme ?
-- [ ] add advanced settings like seed
+- [ ] identity matching avec une option "already cropped"
+- [ ] add advanced settings
 - [ ] add stop button 
 - [ ] drop folder working pour identity
+- [ ] dissocier chaque field de chaque mode
+- [ ] option pour matcher qu'avec les visages sains, après comparar tu peux mettre un filtre
+- [ ] cropping automatique centré sur les visages
 
 ## Valider les changements
 

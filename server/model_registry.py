@@ -3,15 +3,6 @@ import gc, threading
 from typing import Any
 import torch
 import os
-from diffusers import StableDiffusion3Pipeline
-from transformers import AutoModelForImageSegmentation
-from flux2klein_vp import Flux2KleinVPSDEPipeline
-
-from finedits import FINEdits
-from background_remover import BackgroundRemover
-from identity import IdentityModel
-
-TOKEN = os.getenv("HUGGING_FACE_TOKEN")
 
 class ModelRegistry:
     def __init__(self):
@@ -46,30 +37,36 @@ class ModelRegistry:
         torch.cuda.empty_cache()
 
     def _load_edit(self):
+        from diffusers import StableDiffusion3Pipeline
+        from finedits import FINEdits
         pipe = StableDiffusion3Pipeline.from_pretrained(
             "stabilityai/stable-diffusion-3-medium-diffusers",
             torch_dtype=torch.bfloat16,
-            token=TOKEN
+            token=os.getenv("HUGGING_FACE_TOKEN")
         )
         image_editor = FINEdits(pipe)
         return image_editor
-    
+
     def _load_flux2klein(self):
+        from flux2klein_vp import Flux2KleinVPSDEPipeline
         pipe = Flux2KleinVPSDEPipeline.from_pretrained(
-            "black-forest-labs/FLUX.2-klein-base-4B", 
+            "black-forest-labs/FLUX.2-klein-base-4B",
             torch_dtype=torch.bfloat16,
-            token=TOKEN
+            token=os.getenv("HUGGING_FACE_TOKEN")
         ).to("cuda")
         return pipe
-    
+
     def _load_remove_background(self):
+        from transformers import AutoModelForImageSegmentation
+        from background_remover import BackgroundRemover
         model = AutoModelForImageSegmentation.from_pretrained(
             'briaai/RMBG-2.0',
             trust_remote_code=True,
-            token=TOKEN
+            token=os.getenv("HUGGING_FACE_TOKEN")
         ).eval().to("cuda")
         background_remover = BackgroundRemover(model)
         return background_remover
 
     def _load_identity(self):
+        from identity import IdentityModel
         return IdentityModel()

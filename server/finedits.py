@@ -1,12 +1,8 @@
 import torch
 from diffusers.image_processor import VaeImageProcessor
 import torch.nn.functional as F
-import torch
-import bitsandbytes as bnb
 from copy import deepcopy
-import matplotlib.pyplot as plt
 import gc
-from sklearn.cluster import KMeans
 from torchvision.transforms.functional import gaussian_blur
 from progress import ptqdm
 
@@ -16,6 +12,7 @@ def logit_sampler(mean_logit : float = 0, std_logit : float = 1, batch_size : in
     return u
 
 def kmeans_mask(map_tensor):
+    from sklearn.cluster import KMeans
     km = KMeans(2, n_init=1, random_state=42).fit(map_tensor.cpu().numpy().reshape(-1,1))
     mask = torch.from_numpy(km.labels_.reshape(map_tensor.shape)).float()
     return mask if km.cluster_centers_[0] < km.cluster_centers_[1] else 1-mask
@@ -204,6 +201,7 @@ class FINEdits:
         self.z0 = self._prepare_z0(img)
 
         if fine_tune:
+            import bitsandbytes as bnb
             self._reset_transformer()
             optimizer = bnb.optim.Adam8bit(self.pipe.transformer.parameters(),lr=lr)
             self.pipe.transformer.requires_grad_(True)
@@ -325,6 +323,7 @@ class FINEdits:
             )
             del prompt_embeds_for_mask, pooled_prompt_embeds_for_mask
             if show_mask:
+                import matplotlib.pyplot as plt
                 plt.imshow(mask.float().cpu())
                 plt.show()
 
