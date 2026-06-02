@@ -205,7 +205,7 @@ async def flux2klein(
 
     print(f"flux2klein: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}  seed={seed}  size={width}x{height}")
 
-    tracker.set("Generating", 0, num_inference_steps)
+    tracker.set("Loading", 0, num_inference_steps)
     t = tqdm(total=num_inference_steps, desc="Generating")
 
     def _run():
@@ -241,7 +241,7 @@ async def identity(images: list[UploadFile] = File(...), caption: str = Form("")
     skipped = 0
     ids: list[str] = []
 
-    tracker.set("Embedding", 0, len(images))
+    tracker.set("Loading", 0, len(images))
 
     def _run():
         nonlocal processed, faces_found, skipped
