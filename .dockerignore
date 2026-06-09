@@ -1,0 +1,15 @@
+# Docker uses THIS file (not .gitignore) to scope the build context.
+# Keep host artifacts out of the image — especially platform-specific binaries
+# (a host .venv / node_modules would break inside the image) and any secrets.
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.py[cod]
+.git
+.gitignore
+frontend/dist
+server/.env
+server/assets
+src-tauri/target
+src-tauri/binaries
+**/.DS_Store

@@ -25,6 +25,17 @@ Then we can just do
 uv run python app.py
 ```
 
+## Clean-install test (Docker + GPU)
+
+Emulate a brand-new user installing and running the web app from scratch — clean
+image, real model download, real GPU inference. Full guide:
+[docs/clean-install-test.md](docs/clean-install-test.md).
+
+```bash
+docker compose build                          # build the image (once)
+docker compose run --rm --service-ports app   # run it, then open http://localhost:8080
+```
+
 ## Todo
 
 - [ ] identity matching avec une option "already cropped"

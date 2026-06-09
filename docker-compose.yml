@@ -1,0 +1,34 @@
+# Clean-install / new-user emulation for the imgbox web app.
+# One CUDA container: builds the SPA and serves it from the FastAPI backend.
+#
+# COLD by default (no model cache) so the first inference downloads the weights,
+# exactly like a brand-new user. Full walkthrough: docs/clean-install-test.md
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Pseudo-TTY so the HF download progress renders live.
+    tty: true
+    ports:
+      - "8080:8080"            # open http://localhost:8080 in your host browser
+    environment:
+      # Flush logs immediately (no block-buffering).
+      - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    # ── Warm iteration ONLY — NOT the new-user experience ────────────────────
+    # Persist the HuggingFace cache across runs so you don't re-download multi-GB
+    # weights while iterating on this harness. Reset to a true cold state with:
+    #   docker compose down && docker volume rm imgbox_hf-cache
+    # volumes:
+    #   - hf-cache:/root/.cache/huggingface
+
+# volumes:
+#   hf-cache:
