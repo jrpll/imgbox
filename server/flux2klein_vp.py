@@ -31,6 +31,8 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.pipelines.flux2.image_processor import Flux2ImageProcessor
 from diffusers.pipelines.flux2.pipeline_output import Flux2PipelineOutput
 
+from device import DEVICE
+
 
 logger = logging.get_logger(__name__)
 
@@ -242,7 +244,7 @@ class FlowMatchVPSDEScheduler(FlowMatchEulerDiscreteScheduler):
         v_r = ds_r * sample / s_r + dt_r * s_r * v_t_r
         return v_r
     
-    @torch.autocast(device_type="cuda")
+    @torch.autocast(device_type=DEVICE)
     def step_sde(
         self, 
         model_fn: Callable, 

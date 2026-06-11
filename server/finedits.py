@@ -5,8 +5,9 @@ from copy import deepcopy
 import gc
 from torchvision.transforms.functional import gaussian_blur
 from progress import ptqdm
+from device import DEVICE, empty_cache
 
-def logit_sampler(mean_logit : float = 0, std_logit : float = 1, batch_size : int = 10, device : str = "cuda", dtype = torch.bfloat16):
+def logit_sampler(mean_logit : float = 0, std_logit : float = 1, batch_size : int = 10, device : str = DEVICE, dtype = torch.bfloat16):
     u = torch.normal(mean=mean_logit, std=std_logit, size=(batch_size,), device=device, dtype = dtype)
     u = torch.nn.functional.sigmoid(u)
     return u
@@ -51,10 +52,10 @@ class FINEdits:
 
     @torch.no_grad()
     def _prepare_z0(self,img):
-        self.pipe.vae.cuda()
+        self.pipe.vae.to(DEVICE)
         image_processor = VaeImageProcessor(vae_scale_factor=8, vae_latent_channels=16)
         img = image_processor.preprocess(img)
-        image = img.to(device="cuda", dtype = torch.bfloat16)
+        image = img.to(device=DEVICE, dtype = torch.bfloat16)
         init_latents = self.pipe.vae.encode(image).latent_dist.sample(None)
         init_latents = (init_latents - self.pipe.vae.config.shift_factor) * self.pipe.vae.config.scaling_factor
         z0 = torch.cat([init_latents], dim=0)
@@ -63,9 +64,9 @@ class FINEdits:
         
     @torch.no_grad()
     def _prepare_prompt_embeds(self,prompt,neg_prompt=""):
-        self.pipe.text_encoder.cuda()
-        self.pipe.text_encoder_2.cuda()
-        self.pipe.text_encoder_3.cuda()
+        self.pipe.text_encoder.to(DEVICE)
+        self.pipe.text_encoder_2.to(DEVICE)
+        self.pipe.text_encoder_3.to(DEVICE)
         prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds = self.pipe.encode_prompt(
                 prompt=prompt,
                 prompt_2=prompt,
@@ -73,8 +74,8 @@ class FINEdits:
                 negative_prompt=neg_prompt,
                 negative_prompt_2=neg_prompt,
                 negative_prompt_3=neg_prompt,
-                device="cuda",
-            ) 
+                device=DEVICE,
+            )
 
         prompt_embeds = torch.cat([negative_prompt_embeds,prompt_embeds],dim=0)
         pooled_prompt_embeds = torch.cat([negative_pooled_prompt_embeds,pooled_prompt_embeds],dim=0)
@@ -201,9 +202,12 @@ class FINEdits:
         self.z0 = self._prepare_z0(img)
 
         if fine_tune:
-            import bitsandbytes as bnb
             self._reset_transformer()
-            optimizer = bnb.optim.Adam8bit(self.pipe.transformer.parameters(),lr=lr)
+            if DEVICE == "cuda":
+                import bitsandbytes as bnb  # CUDA-only; plain Adam elsewhere
+                optimizer = bnb.optim.Adam8bit(self.pipe.transformer.parameters(),lr=lr)
+            else:
+                optimizer = torch.optim.Adam(self.pipe.transformer.parameters(),lr=lr)
             self.pipe.transformer.requires_grad_(True)
             optimizer.zero_grad()
             z0 = torch.cat([self.z0]*batch_size)
@@ -211,7 +215,7 @@ class FINEdits:
                 for i in ptqdm(range(num_train_steps*int(simulated_batch_size/batch_size)), "Training"):
                     noise = torch.randn_like(z0)
                     sigmas = logit_sampler(batch_size = batch_size, dtype = torch.bfloat16)
-                    t=torch.tensor(sigmas*1000,device="cuda", dtype = torch.bfloat16)
+                    t=torch.tensor(sigmas*1000,device=DEVICE, dtype = torch.bfloat16)
                     sigmas = sigmas.view(batch_size,1,1,1)
                     noised_latents = (1.0 - sigmas) * z0 + sigmas * noise
                     target_vf = noise - z0
@@ -231,9 +235,9 @@ class FINEdits:
         zts = [self.z0]
         self.num_inversion_steps = num_inversion_steps
         self.pipe.scheduler.set_timesteps(self.num_inversion_steps)
-        self.timesteps = self.pipe.scheduler.timesteps.cuda()
+        self.timesteps = self.pipe.scheduler.timesteps.to(DEVICE)
         self.sigmas = self.pipe.scheduler.sigmas
-        self.inversion_timesteps = torch.cat([torch.tensor([0.0],device="cuda"),self.timesteps.flip(0)[:-1]])
+        self.inversion_timesteps = torch.cat([torch.tensor([0.0],device=DEVICE),self.timesteps.flip(0)[:-1]])
         self.inversion_sigmas = self.sigmas.flip(0)
         latent = self.z0.clone()
 
@@ -342,13 +346,13 @@ class FINEdits:
             vf_pred = vf_pred_neg + 7*(vf_pred_prior-vf_pred_neg)
             latent += (sigmas[i+1]-sigmas[i])*vf_pred
             if (i < self.num_inversion_steps - pasting_cutoff - num_skipped_steps) and do_masking:
-                latent = latent * mask.cuda().to(torch.bfloat16) + zts_ref[i+1] * (1 - mask.cuda().to(torch.bfloat16))
+                latent = latent * mask.to(DEVICE, torch.bfloat16) + zts_ref[i+1] * (1 - mask.to(DEVICE, torch.bfloat16))
             new_zts_ref.append(latent)
 
         self.tmp_zts = new_zts_ref
         self.tmp_prompt = prompt
 
-        self.pipe.vae.cuda()
+        self.pipe.vae.to(DEVICE)
         image_processor = VaeImageProcessor(vae_scale_factor=8, vae_latent_channels=16)
         latents_rescaled = (latent / self.pipe.vae.config.scaling_factor) + self.pipe.vae.config.shift_factor
         image = self.pipe.vae.decode(latents_rescaled, return_dict=False)[0]
@@ -364,6 +368,6 @@ class FINEdits:
     def _reset_transformer(self):
         self.attn.clear()
         del self.pipe.transformer
-        torch.cuda.empty_cache()
+        empty_cache()
         gc.collect()
-        self.pipe.transformer = deepcopy(self.transformer_copy).to("cuda")
+        self.pipe.transformer = deepcopy(self.transformer_copy).to(DEVICE)

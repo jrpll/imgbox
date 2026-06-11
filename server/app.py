@@ -30,6 +30,7 @@ def _save_with_exif(image: Image.Image, fmt: str, **save_kwargs) -> io.BytesIO:
 
 register_heif_opener()
 
+from device import DEVICE
 from model_registry import ModelRegistry
 from progress import tracker
 import identity_store
@@ -80,7 +81,9 @@ async def set_config(hf_token: str = Form(...)):
 # ---------------------------------------------------------------------------
 @app.get("/health")
 async def health():
-    return {"status": "ready" if registry.current() else "loading"}
+    if DEVICE == "cpu":
+        raise HTTPException(status_code=503, detail={"status": "no_accelerator", "device": "cpu"})
+    return {"status": "ready" if registry.current() else "loading", "device": DEVICE}
 
 
 # ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@ AI-powered image editing desktop app. User uploads an image, describes what it l
 
 ## How to run in dev
 
-**Backend** (requires CUDA GPU):
+**Backend** (requires a CUDA GPU or Apple Silicon — device auto-detected in `server/device.py`):
 ```bash
 cd server && uv run uvicorn app:app --reload --port 8080
 ```
@@ -104,7 +104,7 @@ The fine-tuned transformer state persists in memory between `/generate` and subs
 |---|---|---|
 | `POST /generate` | multipart: `image`, `text1`, `text2` | JPEG blob |
 | `POST /edit` | multipart: `slider` (0–1), `text1`, `text2` | JPEG blob |
-| `GET /health` | — | `{"status": "ready" \| "loading" \| "no_cuda"}` |
+| `GET /health` | — | `{"status": "ready" \| "loading", "device": "cuda" \| "mps"}`; 503 if CPU-only |
 
 ---
 
@@ -126,7 +126,8 @@ The fine-tuned transformer state persists in memory between `/generate` and subs
 - **SVG import**: WebKitGTK rejects ES module imports with `Content-Type: image/svg+xml`. Use `?raw` import + `dangerouslySetInnerHTML`.
 - **Vite port**: configured to `strictPort: true` on 5173. Kill stale processes before starting dev.
 - **Backend port**: always start uvicorn with `--port 8080`. Default is 8000, which the frontend won't find.
-- **No CUDA → 503**: server returns 503 if `torch.cuda.is_available()` is False.
+- **Device selection**: `server/device.py` is the single source of truth (`DEVICE` resolves cuda → mps → cpu; `empty_cache()` dispatches per backend). Never hardcode `"cuda"` / `.cuda()` in server code. `/health` returns 503 when only CPU is available.
+- **MPS caveats**: bitsandbytes `Adam8bit` is CUDA-only — `ft_invert` falls back to `torch.optim.Adam` on MPS (full fp32 optimizer states, so edit mode realistically needs a 32 GB+ Mac). `onnxruntime-gpu` has no macOS wheels; pyproject splits onnxruntime by platform.
 
 ---
 

@@ -4,6 +4,8 @@ from typing import Any
 import torch
 import os
 
+from device import DEVICE, empty_cache
+
 class ModelRegistry:
     def __init__(self):
         self._loaders = {
@@ -34,7 +36,7 @@ class ModelRegistry:
         self._current_model = None
         self._current_name = None
         gc.collect()
-        torch.cuda.empty_cache()
+        empty_cache()
 
     def _load_edit(self):
         from diffusers import StableDiffusion3Pipeline
@@ -53,7 +55,7 @@ class ModelRegistry:
             "black-forest-labs/FLUX.2-klein-base-4B",
             torch_dtype=torch.bfloat16,
             token=os.getenv("HUGGING_FACE_TOKEN")
-        ).to("cuda")
+        ).to(DEVICE)
         return pipe
 
     def _load_remove_background(self):
@@ -63,7 +65,7 @@ class ModelRegistry:
             'briaai/RMBG-2.0',
             trust_remote_code=True,
             token=os.getenv("HUGGING_FACE_TOKEN")
-        ).eval().to("cuda")
+        ).eval().to(DEVICE)
         background_remover = BackgroundRemover(model)
         return background_remover
 

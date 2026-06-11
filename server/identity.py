@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -23,9 +24,13 @@ class IdentityModel:
     def __init__(self):
         from insightface.app import FaceAnalysis
         _flatten_nested_pack(self.name)
+        if sys.platform == "darwin":
+            providers = ["CoreMLExecutionProvider", "CPUExecutionProvider"]
+        else:
+            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         self.app = FaceAnalysis(
             name=self.name,
-            providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+            providers=providers,
         )
         self.app.prepare(ctx_id=0, det_size=(640, 640))
 
