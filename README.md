@@ -4,57 +4,39 @@
 ![MPS](https://img.shields.io/badge/Apple%20Silicon-MPS-black?logo=apple&logoColor=white)
 [![GitHub stars](https://img.shields.io/github/stars/jrpll/imgbox?style=social)](https://github.com/jrpll/imgbox/stargazers)
 
+## Set up
+
+First, get a HuggingFace account, [accept the Stable Diffusion 3 Medium license](https://huggingface.co/stabilityai/stable-diffusion-3-medium) and [get a token](https://huggingface.co/docs/hub/security-tokens) to be able to download models.
+
+Then run this once:
+```bash
+cd frontend && npm install
+npm run build
+```
+
+And then to start the app:
+```bash
+cd ../server && uv run python app.py
+```
+
+Drop the token in the right panel and you should be good to go. Please note, on the first run the models take a while to download.
+You also need a 12GB GPU for the lightest edit mode based on Flux2-Klein-4B.
+
 ## Testing
 
-Start backend
+For development, you can start backend like this:
 
 ```bash
 cd server && uv run uvicorn app:app --reload --port 8080
 ```
 
-Start the UI
+And start the UI:
 
 ```bash
 cd frontend && npm run dev
 ```
 
-## Build frontend for single command launch
-
-```bash
-npm run build
-```
-
-Then we can just do
-```bash
-uv run python app.py
-```
-
-## Clean-install test (Docker + GPU)
-
-Emulate a brand-new user installing and running the web app from scratch — clean
-image, real model download, real GPU inference. Full guide:
-[docs/clean-install-test.md](docs/clean-install-test.md).
-
-```bash
-docker compose build                          # build the image (once)
-docker compose run --rm --service-ports app   # run it, then open http://localhost:8080
-```
-
-## Todo
-
-- [ ] identity matching avec une option "already cropped"
-- [ ] add stop button 
-- [ ] dissocier chaque field de chaque mode
-- [ ] option pour matcher qu'avec les visages sains, après comparar tu peux mettre un filtre
-- [ ] cropping automatique centré sur les visages
-
-## Valider les changements
-
-```bash
-git add .
-git commit -m ""
-git push origin main
-```
+To emulate a brand-new user installing from scratch (Docker + GPU, real model download), see [docs/clean-install-test.md](docs/clean-install-test.md).
 
 ---
 
