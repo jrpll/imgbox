@@ -1,6 +1,7 @@
 import { X } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
+import ImageDropZone from '../ImageDropZone';
 
 const initialState = {
   prompt: '',
@@ -11,12 +12,14 @@ const initialState = {
   height: '',
 };
 
-function Inputs({ state, setState }) {
+function Inputs({ state, setState, images, setImages, onZoom }) {
   const { t } = useLang();
   const set = (patch) => setState((s) => ({ ...s, ...patch }));
 
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+      <ImageDropZone images={images} onChange={setImages} multi onZoom={onZoom} />
+
       <div className="group flex flex-col gap-1">
         <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('flux.prompt')}</span>
         <div className="relative">
@@ -111,7 +114,6 @@ const canSubmit = ({ state }) => !!state.prompt;
 
 export default {
   label: 'mode.flux2klein',
-  maxImages: 'unlimited',
   initialState,
   Inputs,
   submit,

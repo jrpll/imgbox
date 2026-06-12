@@ -1,14 +1,17 @@
 import { User, X } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
+import ImageDropZone from '../ImageDropZone';
 
 const initialState = { caption: '' };
 
-function Inputs({ state, setState }) {
+function Inputs({ state, setState, images, setImages, onZoom }) {
   const { t } = useLang();
   const set = (patch) => setState((s) => ({ ...s, ...patch }));
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+      <ImageDropZone images={images} onChange={setImages} multi directory onZoom={onZoom} />
+
       <div className="group flex flex-col gap-1">
         <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('common.caption')}</span>
         <div className="relative">
@@ -73,8 +76,6 @@ function Result({ meta, onZoom }) {
 
 export default {
   label: 'mode.identity',
-  maxImages: 'unlimited',
-  directoryPicker: true,
   initialState,
   Inputs,
   Result,

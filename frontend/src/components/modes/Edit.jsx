@@ -1,6 +1,7 @@
 import { X } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
+import ImageDropZone from '../ImageDropZone';
 
 const initialState = {
   step: 1,
@@ -13,7 +14,7 @@ const initialState = {
   numInversionSteps: '',
 };
 
-function Inputs({ state, setState }) {
+function Inputs({ state, setState, images, setImages, onZoom }) {
   const { t } = useLang();
   const set = (patch) => setState((s) => ({ ...s, ...patch }));
   const locked = !state.trained;
@@ -22,6 +23,8 @@ function Inputs({ state, setState }) {
     <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
       {state.step === 1 ? (
         <>
+          <ImageDropZone images={images} onChange={setImages} onZoom={onZoom} />
+
           <div className="group flex flex-col gap-1">
             <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.source')}</span>
             <div className="relative">
@@ -167,7 +170,6 @@ const canSubmit = ({ images, state }) => {
 
 export default {
   label: 'mode.edit',
-  maxImages: 1,
   initialState,
   Inputs,
   submit,
