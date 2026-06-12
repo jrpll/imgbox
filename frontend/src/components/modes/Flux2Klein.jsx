@@ -2,6 +2,7 @@ import { X } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
 import ImageDropZone from '../ImageDropZone';
+import AdvancedSettings from '../AdvancedSettings';
 
 const initialState = {
   prompt: '',
@@ -37,6 +38,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
         </div>
       </div>
 
+      <AdvancedSettings>
       <div className="flex gap-3">
         <div className="group flex-1 flex flex-col gap-1">
           <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('flux.inference_steps')}</span>
@@ -93,6 +95,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
           />
         </div>
       </div>
+      </AdvancedSettings>
     </div>
   );
 }

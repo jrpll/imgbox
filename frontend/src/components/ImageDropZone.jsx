@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Upload, X } from '@phosphor-icons/react';
+import { Upload, X, Image, Folder } from '@phosphor-icons/react';
 import { useLang } from '../lib/i18n';
 
 export default function ImageDropZone({ images, onChange, multi = false, directory = false, onZoom }) {
@@ -8,7 +8,19 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
   const [imageAspect, setImageAspect] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const fileInputRef = useRef(null);
+  const dirInputRef = useRef(null);
+  const zoneRef = useRef(null);
+
+  useEffect(() => {
+    if (!choosing) return;
+    const close = (e) => {
+      if (zoneRef.current && !zoneRef.current.contains(e.target)) setChoosing(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [choosing]);
 
   useEffect(() => {
     if (!images.length) { setImageUrls([]); setImageAspect(null); return; }
@@ -75,6 +87,15 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
 
   const removeAt = (idx) => onChange(prev => prev.filter((_, i) => i !== idx));
 
+  const handleZoneClick = () => {
+    if (!multi && images.length) return;
+    if (!directory) {
+      fileInputRef.current?.click();
+      return;
+    }
+    setChoosing(c => !c);
+  };
+
   return (
     <div
       className="group flex flex-col gap-1"
@@ -86,7 +107,8 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
         {multi && images.length > 0 && <span className="text-gray-300"> · {images.length}</span>}
       </span>
       <div
-        onClick={() => (multi || !images.length) && fileInputRef.current?.click()}
+        ref={zoneRef}
+        onClick={handleZoneClick}
         onDragEnter={() => setIsDragging(true)}
         onDragLeave={() => setIsDragging(false)}
         onDragOver={(e) => e.preventDefault()}
@@ -148,6 +170,25 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
             </button>
           </div>
         )}
+        {choosing && (
+          <div className="absolute inset-0.5 z-10 flex rounded overflow-hidden bg-gray-50">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setChoosing(false); fileInputRef.current?.click(); }}
+              className="flex-1 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <Image size={24} />
+            </button>
+            <div className="w-px bg-gray-200 my-3" />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setChoosing(false); dirInputRef.current?.click(); }}
+              className="flex-1 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <Folder size={24} />
+            </button>
+          </div>
+        )}
       </div>
       <input
         ref={fileInputRef}
@@ -155,9 +196,19 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
         className="hidden"
         accept="image/*"
         multiple={multi}
-        {...(directory ? { webkitdirectory: '', directory: '' } : {})}
         onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
       />
+      {directory && (
+        <input
+          ref={dirInputRef}
+          type="file"
+          className="hidden"
+          multiple
+          webkitdirectory=""
+          directory=""
+          onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
+        />
+      )}
     </div>
   );
 }

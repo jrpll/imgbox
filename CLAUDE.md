@@ -47,6 +47,7 @@ frontend/src/
 │   │                          identity database browser, lightbox/overlays
 │   ├── ImageDropZone.jsx    # Reusable upload zone (drag-drop incl. directory traversal,
 │   │                          HEIC conversion, thumbnails) — modes render it themselves
+│   ├── AdvancedSettings.jsx # Collapsible disclosure for non-prompt tuning fields
 │   └── modes/
 │       ├── Edit.jsx             # 'edit': two-step FINEdits flow (train+invert, then slider edits)
 │       ├── Flux2Klein.jsx       # 'flux2klein': prompt + optional reference images
@@ -93,7 +94,7 @@ Each file under `components/modes/` exports a config object. `ImageEditor.jsx` o
 ```
 
 Notes:
-- The shell owns `images` (so persistence/rehydration/Reset stay uniform) but modes decide where and whether to show the upload UI by rendering `<ImageDropZone images={images} onChange={setImages} multi? directory? onZoom={onZoom} />` inside their `Inputs`. Edit mode renders it only in step 1; `multi` allows unlimited images; `directory` makes the file picker select a folder (identity mode).
+- The shell owns `images` (so persistence/rehydration/Reset stay uniform) but modes decide where and whether to show the upload UI by rendering `<ImageDropZone images={images} onChange={setImages} multi? directory? onZoom={onZoom} />` inside their `Inputs`. Edit mode renders it only in step 1; `multi` allows unlimited images. Folders can be drag-dropped onto any multi zone (the drop handler traverses directories). A browser file dialog can't offer files and folders at once (platform limitation, even native on Linux), so `directory` (identity mode) makes a click on the zone split it into two icon halves — image icon (left) opens the image picker, folder icon (right) opens the folder picker. Without `directory`, click opens the image picker directly.
 - `images` is always an array (single-image modes use `images[0]`).
 - `submit` returns `blob` (result image) and/or `meta` (arbitrary JSON, rendered by `Result`).
 - Modes do not use refs and do not plumb readiness up via callbacks — derive from state.

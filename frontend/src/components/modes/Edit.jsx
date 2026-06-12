@@ -2,6 +2,7 @@ import { X } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
 import ImageDropZone from '../ImageDropZone';
+import AdvancedSettings from '../AdvancedSettings';
 
 const initialState = {
   step: 1,
@@ -59,6 +60,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             </div>
           </div>
 
+          <AdvancedSettings>
           <div className="flex gap-3">
             <div className="group flex-1 flex flex-col gap-1">
               <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.training_steps')}</span>
@@ -81,6 +83,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
               />
             </div>
           </div>
+          </AdvancedSettings>
         </>
       ) : (
         <>
@@ -148,8 +151,8 @@ async function submit({ images, state }) {
     fd.append('image', images[0]);
     fd.append('text1', state.text1);
     fd.append('text2', state.text2);
-    fd.append('num_train_steps', state.numTrainSteps);
-    fd.append('num_inversion_steps', state.numInversionSteps);
+    if (Number.isInteger(state.numTrainSteps)) fd.append('num_train_steps', state.numTrainSteps);
+    if (Number.isInteger(state.numInversionSteps)) fd.append('num_inversion_steps', state.numInversionSteps);
     const r = await apiPost('/generate', fd);
     return { blob: await r.blob(), state: { ...state, trained: true, step: 2 } };
   } else {
@@ -164,7 +167,7 @@ async function submit({ images, state }) {
 }
 
 const canSubmit = ({ images, state }) => {
-  if (state.step === 1) return !!(images.length && state.text1 && state.text2 && state.numTrainSteps && state.numInversionSteps);
+  if (state.step === 1) return !!(images.length && state.text1 && state.text2);
   return !!(state.trained && state.text2);
 };
 

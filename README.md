@@ -1,4 +1,8 @@
-![imgbox logo](frontend/src/assets/imgbox_2.png)
+![imgbox logo](frontend/src/assets/imgbox3.png)
+
+![CUDA](https://img.shields.io/badge/CUDA-supported-76B900?logo=nvidia&logoColor=white)
+![MPS](https://img.shields.io/badge/Apple%20Silicon-MPS-black?logo=apple&logoColor=white)
+[![GitHub stars](https://img.shields.io/github/stars/jrpll/imgbox?style=social)](https://github.com/jrpll/imgbox/stargazers)
 
 ## Testing
 
@@ -39,9 +43,7 @@ docker compose run --rm --service-ports app   # run it, then open http://localho
 ## Todo
 
 - [ ] identity matching avec une option "already cropped"
-- [ ] add advanced settings
 - [ ] add stop button 
-- [ ] drop folder working pour identity
 - [ ] dissocier chaque field de chaque mode
 - [ ] option pour matcher qu'avec les visages sains, après comparar tu peux mettre un filtre
 - [ ] cropping automatique centré sur les visages
@@ -53,3 +55,7 @@ git add .
 git commit -m ""
 git push origin main
 ```
+
+---
+
+If imgbox is useful to you, a ⭐ goes a long way.
