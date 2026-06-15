@@ -241,7 +241,7 @@ export default function ImageEditor() {
       {/* Header */}
       <div className="flex items-baseline gap-2 flex-shrink-0 pl-2 w-full">
         <h1 className="text-2xl font-bold">imgbox</h1>
-        <span className="w-6 h-6 block self-center" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="24" height="24"') }} />
+        <span className="w-6 h-6 block self-center dark:invert" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="24" height="24"') }} />
         <div className="relative ml-2" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(o => !o)}
