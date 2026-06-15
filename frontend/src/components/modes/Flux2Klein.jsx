@@ -1,4 +1,5 @@
-import { X } from '@phosphor-icons/react';
+import { useState, useEffect } from 'react';
+import { X, ArrowLeft, ArrowRight, Download, Image as ImageIcon } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
 import ImageDropZone from '../ImageDropZone';
@@ -8,6 +9,7 @@ const initialState = {
   prompt: '',
   numInferenceSteps: '',
   diffusionCoefficient: '',
+  numImagesPerPrompt: '',
   seed: '',
   width: '',
   height: '',
@@ -61,6 +63,17 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
+        <div className="group flex-1 flex flex-col gap-1">
+          <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.num_images')}</span>
+          <input
+            type="number"
+            min="1"
+            placeholder="1"
+            value={state.numImagesPerPrompt}
+            onChange={(e) => set({ numImagesPerPrompt: e.target.value === '' ? '' : parseInt(e.target.value) })}
+            className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
+          />
+        </div>
       </div>
 
       <div className="flex gap-3">
@@ -106,19 +119,94 @@ async function submit({ images, state }) {
   fd.append('prompt', state.prompt);
   if (Number.isInteger(state.numInferenceSteps)) fd.append('num_inference_steps', state.numInferenceSteps);
   if (Number.isFinite(state.diffusionCoefficient)) fd.append('diffusion_coefficient', state.diffusionCoefficient);
+  if (Number.isInteger(state.numImagesPerPrompt)) fd.append('num_images_per_prompt', state.numImagesPerPrompt);
   if (Number.isInteger(state.seed)) fd.append('seed', state.seed);
   if (Number.isInteger(state.width)) fd.append('width', state.width);
   if (Number.isInteger(state.height)) fd.append('height', state.height);
   const r = await apiPost('/flux2klein', fd);
-  return { blob: await r.blob(), state };
+  const { images: b64s } = await r.json();
+  const blobs = await Promise.all(
+    b64s.map((b) => fetch(`data:image/jpeg;base64,${b}`).then((res) => res.blob()))
+  );
+  return { meta: { images: blobs }, state };
 }
 
 const canSubmit = ({ state }) => !!state.prompt;
+
+function Result({ meta, onZoom }) {
+  const blobs = meta?.images || [];
+  const [index, setIndex] = useState(0);
+  const [urls, setUrls] = useState([]);
+
+  useEffect(() => {
+    const created = blobs.map((b) => URL.createObjectURL(b));
+    setUrls(created);
+    setIndex((i) => Math.min(i, Math.max(0, created.length - 1)));
+    return () => created.forEach(URL.revokeObjectURL);
+  }, [meta]);
+
+  if (!urls.length) {
+    return (
+      <div className="flex flex-col items-center gap-2 text-gray-300 dark:text-zinc-600">
+        <ImageIcon size={40} />
+      </div>
+    );
+  }
+
+  const total = urls.length;
+  const i = Math.min(index, total - 1);
+  const url = urls[i];
+
+  return (
+    <div className="relative w-full h-full flex flex-col items-center justify-center gap-3">
+      <button
+        type="button"
+        onClick={() => {
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `generated-${i + 1}.png`;
+          link.click();
+        }}
+        className="absolute top-0 right-0 z-10 flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <Download size={13} />
+      </button>
+      <img
+        src={url}
+        alt="Generated"
+        onClick={() => onZoom(url)}
+        className="flex-1 min-h-0 w-full object-contain rounded cursor-zoom-in"
+      />
+      {total > 1 && (
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setIndex((n) => Math.max(0, n - 1))}
+            disabled={i === 0}
+            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ArrowLeft size={15} />
+          </button>
+          <span className="text-xs text-gray-400 tabular-nums w-12 text-center">{i + 1} / {total}</span>
+          <button
+            type="button"
+            onClick={() => setIndex((n) => Math.min(total - 1, n + 1))}
+            disabled={i === total - 1}
+            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default {
   label: 'mode.flux2klein',
   initialState,
   Inputs,
+  Result,
   submit,
   canSubmit,
 };

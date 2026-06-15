@@ -138,7 +138,7 @@ The fine-tuned transformer state persists in memory between `/generate` and subs
 |---|---|---|
 | `POST /generate` | multipart: `image`, `text1`, `text2`, `num_train_steps`, `num_inversion_steps` | JPEG blob |
 | `POST /edit` | multipart: `slider` (0–1), `text1`, `text2`, `neg_prompt?` | JPEG blob |
-| `POST /flux2klein` | multipart: `images[]?`, `prompt`, `num_inference_steps?`, `diffusion_coefficient?`, `seed?`, `width?`, `height?` | JPEG blob |
+| `POST /flux2klein` | multipart: `images[]?`, `prompt`, `num_inference_steps?`, `diffusion_coefficient?`, `num_images_per_prompt?`, `seed?`, `width?`, `height?` | `{ images: [base64 JPEG, …] }` |
 | `POST /identity` | multipart: `images[]`, `caption?` | `{ processed, faces_found, skipped, ids }` |
 | `GET /identity/list` | — | array of rows (id, source_filename, created_at, gender, caption, …) |
 | `GET /identity/crop/{id}` | — | JPEG face crop |

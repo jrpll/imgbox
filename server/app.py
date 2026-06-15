@@ -1,3 +1,4 @@
+import base64
 from contextlib import asynccontextmanager
 import datetime
 import io
@@ -195,6 +196,7 @@ async def flux2klein(
     prompt: str = Form(""),
     num_inference_steps: int = Form(100),
     diffusion_coefficient: float = Form(3),
+    num_images_per_prompt: int = Form(1),
     seed: int | None = Form(None),
     width: int | None = Form(None),
     height: int | None = Form(None),
@@ -206,7 +208,7 @@ async def flux2klein(
             pil_images.append(Image.open(io.BytesIO(contents)).convert("RGB"))
     pil_image = pil_images if pil_images else None
 
-    print(f"flux2klein: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}  seed={seed}  size={width}x{height}")
+    print(f"flux2klein: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}  n={num_images_per_prompt}  seed={seed}  size={width}x{height}")
 
     tracker.set("Loading", 0, num_inference_steps)
     t = tqdm(total=num_inference_steps, desc="Generating")
@@ -223,19 +225,23 @@ async def flux2klein(
             prompt=prompt,
             num_inference_steps=num_inference_steps,
             diffusion_norm=diffusion_coefficient,
+            num_images_per_prompt=num_images_per_prompt,
             callback_on_step_end=on_step,
             generator=torch_gen,
             width=width,
             height=height,
-        ).images[0]
+        ).images
     try:
         edited = await run_in_threadpool(_run)
     finally:
         t.close()
         tracker.clear()
 
-    buf = _save_with_exif(edited, "JPEG")
-    return StreamingResponse(buf, media_type="image/jpeg")
+    images_b64 = [
+        base64.b64encode(_save_with_exif(img, "JPEG").getvalue()).decode()
+        for img in edited
+    ]
+    return {"images": images_b64}
 
 @app.post("/identity")
 async def identity(images: list[UploadFile] = File(...), caption: str = Form("")):
