@@ -13,7 +13,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
       <ImageDropZone images={images} onChange={setImages} multi directory onZoom={onZoom} />
 
       <div className="group flex flex-col gap-1">
-        <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('common.caption')}</span>
+        <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('common.caption')}</span>
         <div className="relative">
           <textarea
             value={state.caption}
@@ -45,7 +45,7 @@ function Result({ meta, onZoom }) {
   const { t } = useLang();
   if (!meta) {
     return (
-      <div className="flex flex-col items-center gap-2 text-gray-300">
+      <div className="flex flex-col items-center gap-2 text-gray-300 dark:text-zinc-600">
         <User size={40} />
       </div>
     );
@@ -53,7 +53,7 @@ function Result({ meta, onZoom }) {
   const { processed, faces_found, skipped, ids } = meta;
   return (
     <div className="w-full h-full flex flex-col gap-3 overflow-hidden">
-      <div className="text-sm text-gray-600 flex-shrink-0">
+      <div className="text-sm text-gray-600 dark:text-gray-300 flex-shrink-0">
         {t('identity.summary', { processed, faces_found, skipped })}
       </div>
       <div className="flex-1 overflow-y-auto grid grid-cols-4 gap-2 auto-rows-max">

@@ -102,9 +102,9 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <span className="text-xs text-gray-400 group-hover:text-gray-600">
+      <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">
         {t('common.image')}
-        {multi && images.length > 0 && <span className="text-gray-300"> · {images.length}</span>}
+        {multi && images.length > 0 && <span className="text-gray-300 dark:text-zinc-600"> · {images.length}</span>}
       </span>
       <div
         ref={zoneRef}
@@ -115,7 +115,7 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
         onDrop={handleDrop}
         className={`relative h-40 flex items-center justify-center rounded overflow-hidden transition-colors ${
           multi || !images.length ? 'cursor-pointer' : ''
-        } ${isDragging ? 'bg-gray-100' : 'bg-gray-50'}`}
+        } ${isDragging ? 'bg-gray-100 dark:bg-zinc-700' : 'bg-gray-50 dark:bg-zinc-800'}`}
         style={{
           backgroundImage: isDragging
             ? `url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='4' ry='4' stroke='%239ca3af' stroke-width='2' stroke-dasharray='6 5' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e")`
@@ -171,19 +171,19 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
           </div>
         )}
         {choosing && (
-          <div className="absolute inset-0.5 z-10 flex rounded overflow-hidden bg-gray-50">
+          <div className="absolute inset-0.5 z-10 flex rounded overflow-hidden bg-gray-50 dark:bg-zinc-800">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setChoosing(false); fileInputRef.current?.click(); }}
-              className="flex-1 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              className="flex-1 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
             >
               <Image size={24} />
             </button>
-            <div className="w-px bg-gray-200 my-3" />
+            <div className="w-px bg-gray-200 dark:bg-zinc-700 my-3" />
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setChoosing(false); dirInputRef.current?.click(); }}
-              className="flex-1 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              className="flex-1 flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
             >
               <Folder size={24} />
             </button>

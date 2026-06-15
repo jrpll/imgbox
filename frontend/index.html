@@ -8,6 +8,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
 <title>imgbox</title>
+<script>
+  // Apply persisted theme before paint to avoid a flash
+  if (localStorage.getItem('imgbox:theme') === 'dark') document.documentElement.classList.add('dark');
+</script>
 </head>
 <body>
 <div id="root"></div>

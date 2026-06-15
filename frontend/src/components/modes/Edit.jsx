@@ -27,7 +27,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
           <ImageDropZone images={images} onChange={setImages} onZoom={onZoom} />
 
           <div className="group flex flex-col gap-1">
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.source')}</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('edit.source')}</span>
             <div className="relative">
               <textarea
                 value={state.text1}
@@ -44,7 +44,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
           </div>
 
           <div className="group flex flex-col gap-1">
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.target')}</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('edit.target')}</span>
             <div className="relative">
               <textarea
                 value={state.text2}
@@ -63,23 +63,23 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
           <AdvancedSettings>
           <div className="flex gap-3">
             <div className="group flex-1 flex flex-col gap-1">
-              <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.training_steps')}</span>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('edit.training_steps')}</span>
               <input
                 type="number"
                 placeholder="100"
                 value={state.numTrainSteps}
                 onChange={(e) => set({ numTrainSteps: e.target.value === '' ? '' : parseInt(e.target.value) })}
-                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 placeholder-gray-400"
+                className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
               />
             </div>
             <div className="group flex-1 flex flex-col gap-1">
-              <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.inversion_steps')}</span>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('edit.inversion_steps')}</span>
               <input
                 type="number"
                 placeholder="50"
                 value={state.numInversionSteps}
                 onChange={(e) => set({ numInversionSteps: e.target.value === '' ? '' : parseInt(e.target.value) })}
-                className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 placeholder-gray-400"
+                className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
               />
             </div>
           </div>
@@ -88,7 +88,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
       ) : (
         <>
           <div className={`${locked ? '' : 'group '}flex flex-col gap-1`}>
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.target')}</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('edit.target')}</span>
             <div className="relative">
               <textarea
                 value={state.text2}
@@ -106,7 +106,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
           </div>
 
           <div className={`${locked ? '' : 'group '}flex flex-col gap-1`}>
-            <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.negative_prompt')}</span>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('edit.negative_prompt')}</span>
             <div className="relative">
               <textarea
                 value={state.negPrompt}
@@ -125,8 +125,8 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
 
           <div className={`${locked ? '' : 'group '}flex flex-col gap-1.5`}>
             <div className="flex justify-between">
-              <span className="text-xs text-gray-400 group-hover:text-gray-600">{t('edit.preservation')}</span>
-              <span className="text-xs text-gray-400 group-hover:text-gray-600">{Math.round((1 - state.slider) * 100)}%</span>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('edit.preservation')}</span>
+              <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{Math.round((1 - state.slider) * 100)}%</span>
             </div>
             <input
               type="range"
