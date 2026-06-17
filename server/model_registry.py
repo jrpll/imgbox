@@ -55,11 +55,7 @@ class ModelRegistry:
                 "black-forest-labs/FLUX.2-klein-base-4B",
                 torch_dtype=DTYPE,
                 token=os.getenv("HUGGING_FACE_TOKEN")
-        )
-        if DEVICE == "mps":
-            pipe.enable_model_cpu_offload(device=DEVICE)
-        else:
-            pipe = pipe.to(DEVICE)
+        ).to(DEVICE)
         return pipe
 
     def _load_remove_background(self):
