@@ -10,9 +10,10 @@ def _pick_device() -> str:
 
 
 DEVICE = _pick_device()
-# bfloat16 is native on NVIDIA but unreliable on Apple MPS (incomplete kernels →
-# CPU fallback + garbage output), so only use it on CUDA. float32 has full MPS coverage.
-DTYPE = torch.bfloat16 if DEVICE == "cuda" else torch.float32
+# bf16 is correct on both CUDA and MPS. The MPS "gibberish" was caused by the fp16
+# autocast in flux2klein (now gated to CUDA), not by bf16 — and fp32 here doubles the
+# resident footprint and OOMs Apple's unified memory, so keep bf16.
+DTYPE = torch.bfloat16
 
 
 def empty_cache() -> None:

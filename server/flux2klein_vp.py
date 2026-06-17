@@ -244,6 +244,8 @@ class FlowMatchVPSDEScheduler(FlowMatchEulerDiscreteScheduler):
         v_r = ds_r * sample / s_r + dt_r * s_r * v_t_r
         return v_r
     
+    # autocast on MPS defaults to fp16, whose narrow range makes the VP-SDE sqrt/division
+    # math below overflow to NaN over bf16 weights → noise output. Keep it CUDA-only.
     @torch.autocast(device_type=DEVICE, enabled=(DEVICE == "cuda"))
     def step_sde(
         self, 
