@@ -1,5 +1,29 @@
 # Devlog
 
+## 2026-06-17 — MPS (Apple Silicon) support pass
+
+### device.py
+- Tried `DTYPE = float32` on MPS (fb2556b), reverted to bf16 everywhere (4235bdd):
+  fp32 doubled the resident footprint and OOM'd unified memory. The MPS "gibberish"
+  was never bf16 — it was the fp16 autocast in flux2klein (see below).
+
+### finedits.py — edit-mode training (fb2556b)
+- bitsandbytes Adam8bit is CUDA-only. The old MPS fallback (full-param torch.optim.Adam)
+  needs ~16 GB of fp32 optimizer state and crashes the host.
+- Now: freeze the transformer, train a rank-2 peft LoRA (to_q/k/v/out) with plain Adam.
+  Memory fits, but it can't memorize the source image like full FT → edit quality on
+  MPS is degraded. Added `peft>=0.19.1`.
+
+### flux2klein_vp.py — step_sde autocast (4235bdd → 173efdf)
+- autocast defaulted to fp16 on MPS; the VP-SDE sqrt/division math overflowed to NaN → noise.
+- First disabled autocast on MPS, then re-enabled with explicit bf16 (fp16 stays on CUDA).
+  Autocast is still wanted to keep the exp/alpha-sigma chain in fp32.
+
+### model_registry.py — flux2klein offload (2026-06-17)
+- On MPS, load without `.to()` and call `enable_model_cpu_offload(device=DEVICE)` so the
+  idle Qwen3 text encoder isn't resident on the GPU during the denoise loop. Helps only
+  under memory pressure; CUDA path unchanged.
+
 ## 2026-05-24 — Persistence, progress ETA, smooth bar, lightbox, i18n
 
 ### Persistence
