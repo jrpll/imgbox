@@ -4,7 +4,7 @@ from typing import Any
 import torch
 import os
 
-from device import DEVICE, empty_cache
+from device import DEVICE, DTYPE, empty_cache
 
 class ModelRegistry:
     def __init__(self):
@@ -43,7 +43,7 @@ class ModelRegistry:
         from finedits import FINEdits
         pipe = StableDiffusion3Pipeline.from_pretrained(
             "stabilityai/stable-diffusion-3-medium-diffusers",
-            torch_dtype=torch.bfloat16,
+            torch_dtype=DTYPE,
             token=os.getenv("HUGGING_FACE_TOKEN")
         )
         image_editor = FINEdits(pipe)
@@ -53,7 +53,7 @@ class ModelRegistry:
         from flux2klein_vp import Flux2KleinVPSDEPipeline
         pipe = Flux2KleinVPSDEPipeline.from_pretrained(
             "black-forest-labs/FLUX.2-klein-base-4B",
-            torch_dtype=torch.bfloat16,
+            torch_dtype=DTYPE,
             token=os.getenv("HUGGING_FACE_TOKEN")
         ).to(DEVICE)
         return pipe

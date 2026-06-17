@@ -244,7 +244,7 @@ class FlowMatchVPSDEScheduler(FlowMatchEulerDiscreteScheduler):
         v_r = ds_r * sample / s_r + dt_r * s_r * v_t_r
         return v_r
     
-    @torch.autocast(device_type=DEVICE)
+    @torch.autocast(device_type=DEVICE, enabled=(DEVICE == "cuda"))
     def step_sde(
         self, 
         model_fn: Callable, 

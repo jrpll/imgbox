@@ -10,7 +10,9 @@ def _pick_device() -> str:
 
 
 DEVICE = _pick_device()
-DTYPE = torch.bfloat16
+# bfloat16 is native on NVIDIA but unreliable on Apple MPS (incomplete kernels →
+# CPU fallback + garbage output), so only use it on CUDA. float32 has full MPS coverage.
+DTYPE = torch.bfloat16 if DEVICE == "cuda" else torch.float32
 
 
 def empty_cache() -> None:

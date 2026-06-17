@@ -28,4 +28,5 @@ dependencies = [
     "uvicorn[standard]>=0.42.0",
     "pandas>=3.0.3",
     "pylance>=6.0.1",
+    "peft>=0.19.1",
 ]

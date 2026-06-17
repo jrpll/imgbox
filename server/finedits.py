@@ -5,9 +5,9 @@ from copy import deepcopy
 import gc
 from torchvision.transforms.functional import gaussian_blur
 from progress import ptqdm
-from device import DEVICE, empty_cache
+from device import DEVICE, DTYPE, empty_cache
 
-def logit_sampler(mean_logit : float = 0, std_logit : float = 1, batch_size : int = 10, device : str = DEVICE, dtype = torch.bfloat16):
+def logit_sampler(mean_logit : float = 0, std_logit : float = 1, batch_size : int = 10, device : str = DEVICE, dtype = DTYPE):
     u = torch.normal(mean=mean_logit, std=std_logit, size=(batch_size,), device=device, dtype = dtype)
     u = torch.nn.functional.sigmoid(u)
     return u
@@ -55,7 +55,7 @@ class FINEdits:
         self.pipe.vae.to(DEVICE)
         image_processor = VaeImageProcessor(vae_scale_factor=8, vae_latent_channels=16)
         img = image_processor.preprocess(img)
-        image = img.to(device=DEVICE, dtype = torch.bfloat16)
+        image = img.to(device=DEVICE, dtype = DTYPE)
         init_latents = self.pipe.vae.encode(image).latent_dist.sample(None)
         init_latents = (init_latents - self.pipe.vae.config.shift_factor) * self.pipe.vae.config.scaling_factor
         z0 = torch.cat([init_latents], dim=0)
@@ -205,17 +205,29 @@ class FINEdits:
             self._reset_transformer()
             if DEVICE == "cuda":
                 import bitsandbytes as bnb  # CUDA-only; plain Adam elsewhere
+                self.pipe.transformer.requires_grad_(True)
                 optimizer = bnb.optim.Adam8bit(self.pipe.transformer.parameters(),lr=lr)
             else:
-                optimizer = torch.optim.Adam(self.pipe.transformer.parameters(),lr=lr)
-            self.pipe.transformer.requires_grad_(True)
+                # Full-parameter fine-tuning's fp32 optimizer state exhausts unified
+                # memory and crashes the host on MPS; train a rank-16 LoRA adapter instead.
+                from peft import LoraConfig
+                self.pipe.transformer.requires_grad_(False)
+                self.pipe.transformer.add_adapter(LoraConfig(
+                    r=2,
+                    lora_alpha=2,
+                    target_modules=["to_q", "to_k", "to_v", "to_out.0"],
+                ))
+                optimizer = torch.optim.Adam(
+                    [p for p in self.pipe.transformer.parameters() if p.requires_grad],
+                    lr=lr,
+                )
             optimizer.zero_grad()
             z0 = torch.cat([self.z0]*batch_size)
             with torch.enable_grad():
                 for i in ptqdm(range(num_train_steps*int(simulated_batch_size/batch_size)), "Training"):
                     noise = torch.randn_like(z0)
-                    sigmas = logit_sampler(batch_size = batch_size, dtype = torch.bfloat16)
-                    t=torch.tensor(sigmas*1000,device=DEVICE, dtype = torch.bfloat16)
+                    sigmas = logit_sampler(batch_size = batch_size, dtype = DTYPE)
+                    t=torch.tensor(sigmas*1000,device=DEVICE, dtype = DTYPE)
                     sigmas = sigmas.view(batch_size,1,1,1)
                     noised_latents = (1.0 - sigmas) * z0 + sigmas * noise
                     target_vf = noise - z0
@@ -346,7 +358,7 @@ class FINEdits:
             vf_pred = vf_pred_neg + 7*(vf_pred_prior-vf_pred_neg)
             latent += (sigmas[i+1]-sigmas[i])*vf_pred
             if (i < self.num_inversion_steps - pasting_cutoff - num_skipped_steps) and do_masking:
-                latent = latent * mask.to(DEVICE, torch.bfloat16) + zts_ref[i+1] * (1 - mask.to(DEVICE, torch.bfloat16))
+                latent = latent * mask.to(DEVICE, DTYPE) + zts_ref[i+1] * (1 - mask.to(DEVICE, DTYPE))
             new_zts_ref.append(latent)
 
         self.tmp_zts = new_zts_ref
