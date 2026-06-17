@@ -244,9 +244,12 @@ class FlowMatchVPSDEScheduler(FlowMatchEulerDiscreteScheduler):
         v_r = ds_r * sample / s_r + dt_r * s_r * v_t_r
         return v_r
     
-    # autocast on MPS defaults to fp16, whose narrow range makes the VP-SDE sqrt/division
-    # math below overflow to NaN over bf16 weights → noise output. Keep it CUDA-only.
-    @torch.autocast(device_type=DEVICE, enabled=(DEVICE == "cuda"))
+    # autocast does two things here: promotes numerically-sensitive ops (torch.exp and the
+    # whole alpha/sigma chain derived from it) to fp32 — the NaN/precision guard near sigma→0
+    # — while running the transformer matmuls in the fast dtype. The default fast dtype is
+    # fp16, whose narrow range turns those matmuls to noise on MPS, so use bf16 there; CUDA
+    # keeps fp16. Either way the sensitive math stays fp32.
+    @torch.autocast(device_type=DEVICE, dtype=torch.float16 if DEVICE == "cuda" else torch.bfloat16)
     def step_sde(
         self, 
         model_fn: Callable, 
