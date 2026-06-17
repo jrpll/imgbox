@@ -51,19 +51,15 @@ class ModelRegistry:
 
     def _load_flux2klein(self):
         from flux2klein_vp import Flux2KleinVPSDEPipeline
-        if DEVICE == "mps":
-            pipe = Flux2KleinVPSDEPipeline.from_pretrained(
+        pipe = Flux2KleinVPSDEPipeline.from_pretrained(
                 "black-forest-labs/FLUX.2-klein-base-4B",
                 torch_dtype=DTYPE,
                 token=os.getenv("HUGGING_FACE_TOKEN")
-            )
+        )
+        if DEVICE == "mps":
             pipe.enable_model_cpu_offload(device=DEVICE)
         else:
-            pipe = Flux2KleinVPSDEPipeline.from_pretrained(
-                "black-forest-labs/FLUX.2-klein-base-4B",
-                torch_dtype=DTYPE,
-                token=os.getenv("HUGGING_FACE_TOKEN")
-            ).to(DEVICE)
+            pipe = pipe.to(DEVICE)
         return pipe
 
     def _load_remove_background(self):

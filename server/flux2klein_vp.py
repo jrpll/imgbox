@@ -857,7 +857,6 @@ class Flux2KleinVPSDEPipeline(DiffusionPipeline, Flux2LoraLoaderMixin):
                 latents_dtype = latents.dtype
                 use_ode = (i == len(self.scheduler.timesteps) - 1)
                 latents = self.scheduler.step_sde(model_fn, r, latents, dt=dt, diffusion_norm=diffusion_norm, use_ode=use_ode, image_latents=image_latents)[0]
-                print(latents.device)
                 if latents.dtype != latents_dtype:
                     latents = latents.to(latents_dtype)
 
