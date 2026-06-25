@@ -473,7 +473,7 @@ export default function ImageEditor() {
             <button
               type="button"
               onClick={handleReset}
-              className="px-4 h-9 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+              className="px-4 h-9 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition active:scale-[0.96]"
             >
               {t('common.reset')}
             </button>
@@ -481,17 +481,19 @@ export default function ImageEditor() {
               type="button"
               onClick={handleSubmit}
               disabled={!canRun}
-              className={`relative overflow-hidden flex-1 h-9 text-sm font-medium rounded text-white transition-colors ${
+              className={`relative flex-1 h-9 text-sm font-medium rounded text-white transition after:absolute after:content-[''] after:inset-x-0 after:-inset-y-2 ${
                 isLoading
                   ? 'bg-[#bce4ff] cursor-wait'
-                  : 'bg-[#0ea0ff] hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed'
+                  : 'bg-[#0ea0ff] hover:bg-blue-500 active:scale-[0.96] disabled:opacity-40 disabled:cursor-not-allowed'
               }`}
             >
               {isLoading && (
-                <div
-                  className="absolute inset-y-0 left-0 bg-[#0ea0ff]"
-                  style={{ width: `${(progressBar.target * 100).toFixed(1)}%`, transition: `width ${progressBar.duration}ms linear` }}
-                />
+                <span className="absolute inset-0 overflow-hidden rounded">
+                  <span
+                    className="absolute inset-y-0 left-0 bg-[#0ea0ff]"
+                    style={{ width: `${(progressBar.target * 100).toFixed(1)}%`, transition: `width ${progressBar.duration}ms linear` }}
+                  />
+                </span>
               )}
               <span className="relative flex h-full items-center justify-center gap-2">
                 {isLoading ? t('progress.' + (progressMessage || 'Loading')) : t('common.run')}
@@ -516,7 +518,7 @@ export default function ImageEditor() {
                   link.download = 'generated-image.png';
                   link.click();
                 }}
-                className="flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                className="flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition active:scale-[0.96]"
               >
                 <Download size={13} />
               </button>

@@ -5,3 +5,8 @@ server/__pycache__/
 server/assets/
 src-tauri/target/
 src-tauri/binaries/
+
+# Locally-installed Claude Code skills
+.agents/
+.claude/skills/
+skills-lock.json

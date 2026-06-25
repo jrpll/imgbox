@@ -9,13 +9,29 @@
   font-style: normal;
 }
 
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 :root {
   --box-size: 1024px;
   --box-gap: 16px;
-  
+
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
+}
+
+/* Subtle neutral outline on all images for consistent edge definition.
+   Pure black/white only (never tinted) so it never reads as dirt on the edge. */
+img {
+  outline: 1px solid rgba(0, 0, 0, 0.1);
+  outline-offset: -1px;
+}
+
+html.dark img {
+  outline-color: rgba(255, 255, 255, 0.1);
 }
 
 body {
