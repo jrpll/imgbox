@@ -277,6 +277,9 @@ export default function ImageEditor() {
             <SidebarSimple size={20} mirrored />
           </button>
           {settingsOpen && (
+            <>
+            {/* invisible hover buffer so the panel doesn't collapse the instant the cursor leaves its left edge */}
+            <div className="absolute top-0 right-96 h-full w-[32rem] z-40" />
             <div className="absolute top-0 right-0 h-full w-96 bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700 shadow-lg flex flex-col z-50">
               <div className="px-5 pt-5 pb-3 border-b border-gray-100 dark:border-zinc-800 font-semibold">{t('common.settings')}</div>
               <div className="flex flex-col py-2">
@@ -336,6 +339,7 @@ export default function ImageEditor() {
                 </button>
               </div>
             </div>
+            </>
           )}
         </div>
       </div>
