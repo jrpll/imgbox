@@ -427,7 +427,7 @@ export default function ImageEditor() {
       ) : (<>
 
         {/* Input card */}
-        <div className="flex-1 flex flex-col rounded border border-gray-200 dark:border-zinc-700 overflow-hidden">
+        <div className="w-[380px] flex-shrink-0 flex flex-col rounded border border-gray-200 dark:border-zinc-700 overflow-hidden">
           <div className="px-5 pt-4 pb-3 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
             <span className="font-semibold">
               {t('common.input')}

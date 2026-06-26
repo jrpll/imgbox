@@ -41,8 +41,8 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
       </div>
 
       <AdvancedSettings>
-      <div className="flex gap-3">
-        <div className="group flex-1 flex flex-col gap-1">
+      <div className="flex flex-col gap-4">
+        <div className="group flex flex-col gap-1">
           <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.inference_steps')}</span>
           <input
             type="number"
@@ -52,7 +52,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
-        <div className="group flex-1 flex flex-col gap-1">
+        <div className="group flex flex-col gap-1">
           <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.diffusion_coefficient')}</span>
           <input
             type="number"
@@ -63,7 +63,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
-        <div className="group flex-1 flex flex-col gap-1">
+        <div className="group flex flex-col gap-1">
           <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.num_images')}</span>
           <input
             type="number"
@@ -74,10 +74,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
-      </div>
-
-      <div className="flex gap-3">
-        <div className="group flex-1 flex flex-col gap-1">
+        <div className="group flex flex-col gap-1">
           <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.seed')}</span>
           <input
             type="number"
@@ -87,7 +84,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
-        <div className="group flex-1 flex flex-col gap-1">
+        <div className="group flex flex-col gap-1">
           <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.width')}</span>
           <input
             type="number"
@@ -97,7 +94,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
-        <div className="group flex-1 flex flex-col gap-1">
+        <div className="group flex flex-col gap-1">
           <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.height')}</span>
           <input
             type="number"
