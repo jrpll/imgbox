@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CaretLeft } from '@phosphor-icons/react';
+import { CaretDown } from '@phosphor-icons/react';
 import { useLang } from '../lib/i18n';
 
 export default function AdvancedSettings({ children }) {
@@ -13,7 +13,7 @@ export default function AdvancedSettings({ children }) {
         className="flex items-center justify-between w-full text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
       >
         {t('common.advanced')}
-        <CaretLeft size={12} className={`transition-transform ${open ? '-rotate-90' : ''}`} />
+        <CaretDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && children}
     </div>

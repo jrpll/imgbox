@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { LANGS, LangContext, translate } from '../lib/i18n';
-import { X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight, Trash, Eye, Intersect } from '@phosphor-icons/react';
+import { X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight, Trash, Eye, Intersect, Command, KeyReturn } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
 import { apiPost, apiGet, apiDelete, apiEventSource } from '../lib/api';
 import { loadState, saveState, clearState } from '../lib/persist';
@@ -15,6 +15,8 @@ const MODES = {
   'flux2klein': flux2KleinMode,
   'identity': identityMode,
 };
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 
 export default function ImageEditor() {
   const [images, setImages] = useState([]);
@@ -231,6 +233,20 @@ export default function ImageEditor() {
     setResultMeta(null);
     await clearState(mode);
   };
+
+  // Cmd/Ctrl+Enter to run — ref keeps the listener pointed at the latest state without re-binding
+  const runRef = useRef({ canRun, handleSubmit });
+  runRef.current = { canRun, handleSubmit };
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (runRef.current.canRun) runRef.current.handleSubmit();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const Inputs = modeConfig.Inputs;
 
@@ -503,6 +519,12 @@ export default function ImageEditor() {
                 {isLoading ? t('progress.' + (progressMessage || 'Loading')) : t('common.run')}
                 {isLoading && remaining && (
                   <span className="opacity-70">· {remaining} {t('common.left')}</span>
+                )}
+                {!isLoading && (
+                  <span className="inline-flex items-center gap-0.5 opacity-60">
+                    {IS_MAC ? <Command size={12} weight="bold" /> : <span className="text-xs font-semibold">Ctrl</span>}
+                    <KeyReturn size={14} weight="bold" />
+                  </span>
                 )}
               </span>
             </button>
