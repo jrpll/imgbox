@@ -561,7 +561,7 @@ export default function ImageEditor() {
             {modeConfig.Result ? (
               <modeConfig.Result result={result} meta={resultMeta} onZoom={setLightbox} />
             ) : result ? (
-              <img src={result} alt="Generated" onClick={() => setLightbox(result)} className="max-w-full max-h-full object-contain cursor-zoom-in" />
+              <img src={result} alt="Generated" onClick={() => setLightbox(result)} className="max-w-full max-h-full object-contain rounded cursor-zoom-in" />
             ) : (
               <div className="flex flex-col items-center gap-2 text-gray-300 dark:text-zinc-600">
                 <Image size={40} />

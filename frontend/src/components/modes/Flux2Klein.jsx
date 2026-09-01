@@ -176,7 +176,7 @@ function Result({ meta, onZoom }) {
                     setAspects((prev) => (prev[i] === a ? prev : { ...prev, [i]: a }));
                   }}
                   onClick={() => onZoom(url)}
-                  className="block w-full h-full object-contain cursor-zoom-in"
+                  className="block w-full h-full object-contain rounded cursor-zoom-in"
                 />
                 <button
                   type="button"
