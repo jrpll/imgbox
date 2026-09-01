@@ -196,8 +196,8 @@ async def edit(
 async def flux2klein(
     images: list[UploadFile] | None = File(None),
     prompt: str = Form(""),
-    num_inference_steps: int = Form(100),
-    diffusion_coefficient: float = Form(3),
+    num_inference_steps: int = Form(50),
+    diffusion_coefficient: float = Form(0),
     num_images_per_prompt: int = Form(1),
     seed: int | None = Form(None),
     width: int | None = Form(None),
@@ -250,7 +250,6 @@ async def flux2klein(
 async def flux2klein_fast(
     images: list[UploadFile] | None = File(None),
     prompt: str = Form(""),
-    num_inference_steps: int = Form(4),
     num_images_per_prompt: int = Form(1),
     seed: int | None = Form(None),
     width: int | None = Form(None),
@@ -262,6 +261,8 @@ async def flux2klein_fast(
             contents = await upload.read()
             pil_images.append(Image.open(io.BytesIO(contents)).convert("RGB"))
     pil_image = pil_images if pil_images else None
+
+    num_inference_steps = 4
 
     print(f"flux2klein-fast: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  n={num_images_per_prompt}  seed={seed}  size={width}x{height}")
 
