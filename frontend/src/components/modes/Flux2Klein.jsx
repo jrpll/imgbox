@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ArrowLeft, ArrowRight, Download, Image as ImageIcon } from '@phosphor-icons/react';
+import { X, Download, Image as ImageIcon } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
 import ImageDropZone from '../ImageDropZone';
@@ -132,13 +132,13 @@ const canSubmit = ({ state }) => !!state.prompt;
 
 function Result({ meta, onZoom }) {
   const blobs = meta?.images || [];
-  const [index, setIndex] = useState(0);
   const [urls, setUrls] = useState([]);
+  const [aspects, setAspects] = useState({});
 
   useEffect(() => {
     const created = blobs.map((b) => URL.createObjectURL(b));
     setUrls(created);
-    setIndex((i) => Math.min(i, Math.max(0, created.length - 1)));
+    setAspects({});
     return () => created.forEach(URL.revokeObjectURL);
   }, [meta]);
 
@@ -150,53 +150,51 @@ function Result({ meta, onZoom }) {
     );
   }
 
-  const total = urls.length;
-  const i = Math.min(index, total - 1);
-  const url = urls[i];
+  const cols = Math.ceil(Math.sqrt(urls.length));
+  const rows = Math.ceil(urls.length / cols);
+  const rowHeight = `calc((100% - ${(rows - 1) * 8}px) / ${rows})`;
+  const chunks = Array.from({ length: rows }, (_, r) => r * cols);
+  const colWidth = `calc((100% - ${(cols - 1) * 8}px) / ${cols})`;
 
   return (
-    <div className="relative w-full h-full flex flex-col items-center justify-center gap-3">
-      <button
-        type="button"
-        onClick={() => {
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `generated-${i + 1}.png`;
-          link.click();
-        }}
-        className="absolute top-0 right-0 z-10 flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-      >
-        <Download size={13} />
-      </button>
-      <div className="flex-1 min-h-0 w-full flex items-center justify-center">
-        <img
-          src={url}
-          alt="Generated"
-          onClick={() => onZoom(url)}
-          className="max-w-full max-h-full object-contain cursor-zoom-in"
-        />
-      </div>
-      {total > 1 && (
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            type="button"
-            onClick={() => setIndex((n) => Math.max(0, n - 1))}
-            disabled={i === 0}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <ArrowLeft size={15} />
-          </button>
-          <span className="text-xs text-gray-400 tabular-nums w-12 text-center">{i + 1} / {total}</span>
-          <button
-            type="button"
-            onClick={() => setIndex((n) => Math.min(total - 1, n + 1))}
-            disabled={i === total - 1}
-            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <ArrowRight size={15} />
-          </button>
+    <div className="w-full h-full flex flex-col justify-center gap-2 overflow-hidden">
+      {chunks.map((offset) => (
+        <div key={offset} className="w-full flex items-center justify-center gap-2 min-h-0" style={{ height: rowHeight }}>
+          {urls.slice(offset, offset + cols).map((url, j) => {
+            const i = offset + j;
+            return (
+              <div
+                key={i}
+                className="group/thumb relative"
+                style={{ aspectRatio: aspects[i] ?? 1, maxHeight: '100%', maxWidth: colWidth }}
+              >
+                <img
+                  src={url}
+                  alt={`Generated ${i + 1}`}
+                  onLoad={(e) => {
+                    const a = e.currentTarget.naturalWidth / e.currentTarget.naturalHeight;
+                    setAspects((prev) => (prev[i] === a ? prev : { ...prev, [i]: a }));
+                  }}
+                  onClick={() => onZoom(url)}
+                  className="block w-full h-full object-contain cursor-zoom-in"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `generated-${i + 1}.png`;
+                    link.click();
+                  }}
+                  className="absolute top-1 right-1 flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                >
+                  <Download size={13} />
+                </button>
+              </div>
+            );
+          })}
         </div>
-      )}
+      ))}
     </div>
   );
 }
