@@ -557,7 +557,7 @@ export default function ImageEditor() {
             )}
           </div>
 
-          <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-zinc-800/50 overflow-hidden">
+          <div className="flex-1 flex items-center justify-center p-4 bg-gray-50 dark:bg-zinc-800/50 overflow-hidden">
             {modeConfig.Result ? (
               <modeConfig.Result result={result} meta={resultMeta} onZoom={setLightbox} />
             ) : result ? (
