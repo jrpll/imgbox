@@ -5,29 +5,33 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![GitHub stars](https://img.shields.io/github/stars/jrpll/imgbox?style=social)](https://github.com/jrpll/imgbox/stargazers)
 
-## Setup
+## Prerequisites
 
-First, get a HuggingFace account, [accept the Stable Diffusion 3 Medium license](https://huggingface.co/stabilityai/stable-diffusion-3-medium) and [get a token](https://huggingface.co/docs/hub/security-tokens) to be able to download models.
+### OS and software requirements
 
-Then run this once:
+The app is developed for Linux with NVIDIA gpu first, but has been tested and should run on macOS with MPS acceleration as well. The installation requires node as well as NVIDIA drivers.
+
+You will need a 12GB GPU for the lightest edit mode based on Flux2-Klein-4B.
+
+### HF token to download models
+Get a HuggingFace account, [accept the Stable Diffusion 3 Medium license](https://huggingface.co/stabilityai/stable-diffusion-3-medium) as well as the [background removal model license](https://huggingface.co/briaai/RMBG-2.0) and get a token [here](https://huggingface.co/docs/hub/security-tokens). You will paste this token in the app once it is launched.
+
+## Installation
+
+Run the installation script:
 ```bash
-cd frontend && npm install
-npm run build
+bash install.sh
 ```
 
-Set up the Python environment with [uv](https://docs.astral.sh/uv/) (provisions Python 3.12 and installs all dependencies from the lockfile):
+It installs [uv](https://docs.astral.sh/uv/) for smooth python environment management.
+
+And then start the app with:
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-cd ../server && uv sync
+cd server && uv run python app.py
 ```
 
-And then to start the app:
-```bash
-uv run python app.py
-```
+Drop the HF token in the right panel and you should be done. Please note, on the first run the models take a few minutes to download.
 
-Drop the token in the right panel and you should be good to go. Please note, on the first run the models take a while to download.
-You also need a 12GB GPU for the lightest edit mode based on Flux2-Klein-4B.
 
 ## Testing
 
