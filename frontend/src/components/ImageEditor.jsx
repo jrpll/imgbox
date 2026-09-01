@@ -7,12 +7,14 @@ import { loadState, saveState, clearState } from '../lib/persist';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
 import flux2KleinMode from './modes/Flux2Klein';
+import flux2KleinFastMode from './modes/Flux2KleinFast';
 import identityMode from './modes/Identity';
 
 const MODES = {
   'edit': editMode,
   'remove-background': removeBackgroundMode,
   'flux2klein': flux2KleinMode,
+  'flux2klein-fast': flux2KleinFastMode,
   'identity': identityMode,
 };
 
@@ -259,17 +261,21 @@ export default function ImageEditor() {
       {/* Header */}
       <div className="flex items-center gap-2 flex-shrink-0 pl-2 w-full">
         <span className="w-7 h-7 block self-center text-gray-800 dark:text-gray-200" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="28" height="28" fill="currentColor"') }} />
-        <div className="relative" ref={menuRef}>
+        <div className="relative w-[280px]" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(o => !o)}
-            className="flex items-center gap-2 h-7 px-4 text-base font-normal leading-none border border-gray-300 dark:border-zinc-600 rounded hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors min-w-[180px] justify-between"
+            className={`flex items-center gap-2 h-7 px-4 text-base font-normal leading-none border border-gray-300 dark:border-zinc-600 transition-colors w-full justify-between ${menuOpen ? 'rounded-t rounded-b-none bg-gray-100 dark:bg-zinc-700' : 'rounded hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
             style={{ textBox: 'trim-both cap alphabetic' }}
           >
-            {t(modeConfig.label)}
+            <span className="grid">
+              {Object.entries(MODES).map(([value, cfg]) => (
+                <span key={value} className={`col-start-1 row-start-1 text-left ${value === mode ? '' : 'invisible'}`}>{t(cfg.label)}</span>
+              ))}
+            </span>
             <CaretDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
           </button>
           {menuOpen && (
-            <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded shadow-lg z-50 min-w-[280px] py-1">
+            <div className="absolute top-full left-0 w-full bg-white dark:bg-zinc-800 border border-t-0 border-gray-300 dark:border-zinc-600 rounded-b shadow-lg z-50 overflow-hidden">
               {Object.entries(MODES).map(([value, cfg]) => (
                 <button
                   key={value}
@@ -551,11 +557,11 @@ export default function ImageEditor() {
             )}
           </div>
 
-          <div className="flex-1 flex items-center justify-center p-4 bg-gray-50 dark:bg-zinc-800/50 overflow-hidden">
+          <div className="flex-1 flex items-center justify-center bg-gray-50 dark:bg-zinc-800/50 overflow-hidden">
             {modeConfig.Result ? (
               <modeConfig.Result result={result} meta={resultMeta} onZoom={setLightbox} />
             ) : result ? (
-              <img src={result} alt="Generated" onClick={() => setLightbox(result)} className="w-full h-full object-contain rounded cursor-zoom-in" />
+              <img src={result} alt="Generated" onClick={() => setLightbox(result)} className="max-w-full max-h-full object-contain cursor-zoom-in" />
             ) : (
               <div className="flex flex-col items-center gap-2 text-gray-300 dark:text-zinc-600">
                 <Image size={40} />

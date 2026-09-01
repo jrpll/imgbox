@@ -168,12 +168,14 @@ function Result({ meta, onZoom }) {
       >
         <Download size={13} />
       </button>
-      <img
-        src={url}
-        alt="Generated"
-        onClick={() => onZoom(url)}
-        className="flex-1 min-h-0 w-full object-contain rounded cursor-zoom-in"
-      />
+      <div className="flex-1 min-h-0 w-full flex items-center justify-center">
+        <img
+          src={url}
+          alt="Generated"
+          onClick={() => onZoom(url)}
+          className="max-w-full max-h-full object-contain cursor-zoom-in"
+        />
+      </div>
       {total > 1 && (
         <div className="flex items-center gap-1 flex-shrink-0">
           <button

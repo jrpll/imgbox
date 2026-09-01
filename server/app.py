@@ -243,6 +243,58 @@ async def flux2klein(
     ]
     return {"images": images_b64}
 
+@app.post("/flux2klein-fast")
+async def flux2klein_fast(
+    images: list[UploadFile] | None = File(None),
+    prompt: str = Form(""),
+    num_inference_steps: int = Form(4),
+    num_images_per_prompt: int = Form(1),
+    seed: int | None = Form(None),
+    width: int | None = Form(None),
+    height: int | None = Form(None),
+):
+    pil_images = []
+    if images:
+        for upload in images:
+            contents = await upload.read()
+            pil_images.append(Image.open(io.BytesIO(contents)).convert("RGB"))
+    pil_image = pil_images if pil_images else None
+
+    print(f"flux2klein-fast: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  n={num_images_per_prompt}  seed={seed}  size={width}x{height}")
+
+    tracker.set("Loading", 0, num_inference_steps)
+    t = tqdm(total=num_inference_steps, desc="Generating")
+
+    def _run():
+        pipe = registry.acquire('flux2klein-fast')
+        def on_step(_pipe, step_index, _timestep, kwargs):
+            t.update(1)
+            tracker.set_from_tqdm(t)
+            return kwargs
+        torch_gen = torch.Generator().manual_seed(seed) if seed is not None else None
+        return pipe(
+            image=pil_image,
+            prompt=prompt,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=1.0,
+            num_images_per_prompt=num_images_per_prompt,
+            callback_on_step_end=on_step,
+            generator=torch_gen,
+            width=width,
+            height=height,
+        ).images
+    try:
+        edited = await run_in_threadpool(_run)
+    finally:
+        t.close()
+        tracker.clear()
+
+    images_b64 = [
+        base64.b64encode(_save_with_exif(img, "JPEG").getvalue()).decode()
+        for img in edited
+    ]
+    return {"images": images_b64}
+
 @app.post("/identity")
 async def identity(images: list[UploadFile] = File(...), caption: str = Form("")):
     processed = 0
