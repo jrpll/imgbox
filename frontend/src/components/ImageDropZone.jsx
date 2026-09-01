@@ -50,9 +50,14 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
     };
   }, [images]);
 
-  const addFiles = (incoming) => {
-    const fresh = Array.from(incoming).filter(f => f.type.startsWith('image/'));
-    if (!fresh.length) return;
+  // Read each pick into memory right away. A File is only a pointer to the file on
+  // disk, so a second submit re-reads it and fails if it moved (Firefox: NS_ERROR_FILE_NOT_FOUND).
+  const addFiles = async (incoming) => {
+    const picked = Array.from(incoming).filter(f => f.type.startsWith('image/'));
+    if (!picked.length) return;
+    const fresh = await Promise.all(
+      picked.map(async (f) => new File([await f.arrayBuffer()], f.name, { type: f.type }))
+    );
     onChange(prev => multi ? [...prev, ...fresh] : fresh.slice(0, 1));
   };
 
