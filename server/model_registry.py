@@ -12,6 +12,7 @@ class ModelRegistry:
             'edit': self._load_edit,
             'remove-background': self._load_remove_background,
             'flux2klein': self._load_flux2klein,
+            'flux2klein_pe': self._load_flux2klein_pe,
             'flux2klein-fast': self._load_flux2klein_fast,
             'identity': self._load_identity,
         }
@@ -55,7 +56,19 @@ class ModelRegistry:
         pipe = Flux2KleinVPSDEPipeline.from_pretrained(
                 "black-forest-labs/FLUX.2-klein-base-4B",
                 torch_dtype=DTYPE,
-                token=os.getenv("HUGGING_FACE_TOKEN")
+                token=os.getenv("HUGGING_FACE_TOKEN"),
+                text_encoder=None
+        ).to(DEVICE)
+        return pipe
+
+    def _load_flux2klein_pe(self):
+        from flux2klein_vp import Flux2KleinVPSDEPipeline
+        pipe = Flux2KleinVPSDEPipeline.from_pretrained(
+                "black-forest-labs/FLUX.2-klein-base-4B",
+                torch_dtype=DTYPE,
+                token=os.getenv("HUGGING_FACE_TOKEN"),
+                transformer=None,
+                vae=None
         ).to(DEVICE)
         return pipe
 
