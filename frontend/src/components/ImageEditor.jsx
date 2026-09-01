@@ -254,11 +254,11 @@ export default function ImageEditor() {
 
   return (
     <LangContext.Provider value={langCtx}>
-    <div className="relative h-screen bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 flex flex-col p-5 gap-3 overflow-hidden">
+    <div className="relative h-screen bg-white dark:bg-zinc-900 text-gray-800 dark:text-gray-200 flex flex-col p-5 gap-3 overflow-hidden">
 
       {/* Header */}
       <div className="flex items-center gap-2 flex-shrink-0 pl-2 w-full">
-        <span className="w-7 h-7 block self-center dark:invert" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="28" height="28"') }} />
+        <span className="w-7 h-7 block self-center text-gray-800 dark:text-gray-200" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="28" height="28" fill="currentColor"') }} />
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(o => !o)}
@@ -292,7 +292,7 @@ export default function ImageEditor() {
         <div className="ml-auto self-center" ref={settingsRef}>
           <button
             onClick={() => setSettingsOpen(o => !o)}
-            className="p-1.5 rounded-full text-black dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-full text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
           >
             <SidebarSimple size={20} mirrored />
           </button>
@@ -338,7 +338,7 @@ export default function ImageEditor() {
                       <button
                         key={l}
                         onClick={() => handleLangChange(l)}
-                        className={`text-left px-8 py-2 text-sm transition-colors ${lang === l ? 'text-black dark:text-gray-100 font-medium' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
+                        className={`text-left px-8 py-2 text-sm transition-colors ${lang === l ? 'text-gray-800 dark:text-gray-200 font-medium' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
                       >
                         {l}
                       </button>
