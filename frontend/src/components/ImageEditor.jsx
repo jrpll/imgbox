@@ -61,6 +61,7 @@ export default function ImageEditor() {
   };
   const langCtx = useMemo(() => ({ lang, t, setLang: handleLangChange }), [lang, t]);
   const menuRef = useRef(null);
+  const settingsRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -73,6 +74,7 @@ export default function ImageEditor() {
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) setSettingsOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -255,13 +257,12 @@ export default function ImageEditor() {
     <div className="relative h-screen bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100 flex flex-col p-5 gap-3 overflow-hidden">
 
       {/* Header */}
-      <div className="flex items-baseline gap-2 flex-shrink-0 pl-2 w-full">
-        <h1 className="text-2xl font-bold">imgbox</h1>
-        <span className="w-6 h-6 block self-center dark:invert" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="24" height="24"') }} />
-        <div className="relative ml-2" ref={menuRef}>
+      <div className="flex items-center gap-2 flex-shrink-0 pl-2 w-full">
+        <span className="w-7 h-7 block self-center dark:invert" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="28" height="28"') }} />
+        <div className="relative" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(o => !o)}
-            className="flex items-center gap-2 px-4 py-1.5 text-base font-normal leading-none border border-gray-300 dark:border-zinc-600 rounded hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors min-w-[180px] justify-between"
+            className="flex items-center gap-2 h-7 px-4 text-base font-normal leading-none border border-gray-300 dark:border-zinc-600 rounded hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors min-w-[180px] justify-between"
             style={{ textBox: 'trim-both cap alphabetic' }}
           >
             {t(modeConfig.label)}
@@ -283,19 +284,19 @@ export default function ImageEditor() {
         </div>
         <button
           onClick={() => setDatabaseOpen(o => !o)}
-          className={`px-4 py-1.5 text-base font-normal leading-none border border-gray-300 dark:border-zinc-600 rounded transition-colors ${databaseOpen ? 'bg-gray-100 dark:bg-zinc-800' : 'hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
+          className={`flex items-center h-7 px-4 text-base font-normal leading-none border border-gray-300 dark:border-zinc-600 rounded transition-colors ${databaseOpen ? 'bg-gray-100 dark:bg-zinc-800' : 'hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
           style={{ textBox: 'trim-both cap alphabetic' }}
         >
           {t('common.database')}
         </button>
-        <div className="ml-auto self-center" onMouseEnter={() => setSettingsOpen(true)} onMouseLeave={() => setSettingsOpen(false)}>
-          <button className="p-1.5 text-black dark:text-gray-100 hover:text-gray-500 dark:hover:text-gray-400 transition-colors">
+        <div className="ml-auto self-center" ref={settingsRef}>
+          <button
+            onClick={() => setSettingsOpen(o => !o)}
+            className="p-1.5 rounded-full text-black dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+          >
             <SidebarSimple size={20} mirrored />
           </button>
           {settingsOpen && (
-            <>
-            {/* invisible hover buffer so the panel doesn't collapse the instant the cursor leaves its left edge */}
-            <div className="absolute top-0 right-96 h-full w-[32rem] z-40" />
             <div className="absolute top-0 right-0 h-full w-96 bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700 shadow-lg flex flex-col z-50">
               <div className="px-5 pt-5 pb-3 border-b border-gray-100 dark:border-zinc-800 font-semibold">{t('common.settings')}</div>
               <div className="flex flex-col py-2">
@@ -355,7 +356,6 @@ export default function ImageEditor() {
                 </button>
               </div>
             </div>
-            </>
           )}
         </div>
       </div>
