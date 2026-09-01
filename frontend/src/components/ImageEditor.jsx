@@ -194,7 +194,12 @@ export default function ImageEditor() {
       const merged = { ...cfg.initialState, ...(saved.modeState || {}) };
       setModeState(cfg.restoreState ? cfg.restoreState(merged) : merged);
       const restored = saved.images ?? (saved.image ? [saved.image] : []);
-      if (restored.length) setImages(restored);
+      // Re-read into memory: a persisted File can still be a stale pointer to a file on disk.
+      const materialized = await Promise.all(
+        restored.map(async (f) => new File([await f.arrayBuffer()], f.name ?? 'image', { type: f.type }))
+      );
+      if (cancelled) return;
+      if (materialized.length) setImages(materialized);
       if (saved.result) setResult(URL.createObjectURL(saved.result));
       if (saved.meta) setResultMeta(saved.meta);
     })();

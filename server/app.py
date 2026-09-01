@@ -31,7 +31,7 @@ def _save_with_exif(image: Image.Image, fmt: str, **save_kwargs) -> io.BytesIO:
 
 register_heif_opener()
 
-from device import DEVICE
+from device import DEVICE, empty_cache
 from model_registry import ModelRegistry
 from progress import tracker
 import identity_store
@@ -154,6 +154,7 @@ async def generate(
         edited = await run_in_threadpool(_run)
     finally:
         tracker.clear()
+        empty_cache()
 
     buf = _save_with_exif(edited, "JPEG")
     return StreamingResponse(buf, media_type="image/jpeg")
@@ -186,6 +187,7 @@ async def edit(
         edited = await run_in_threadpool(_run)
     finally:
         tracker.clear()
+        empty_cache()
 
     buf = _save_with_exif(edited, "JPEG")
     return StreamingResponse(buf, media_type="image/jpeg")
@@ -236,6 +238,7 @@ async def flux2klein(
     finally:
         t.close()
         tracker.clear()
+        empty_cache()
 
     images_b64 = [
         base64.b64encode(_save_with_exif(img, "JPEG").getvalue()).decode()
@@ -288,6 +291,7 @@ async def flux2klein_fast(
     finally:
         t.close()
         tracker.clear()
+        empty_cache()
 
     images_b64 = [
         base64.b64encode(_save_with_exif(img, "JPEG").getvalue()).decode()
@@ -336,6 +340,7 @@ async def identity(images: list[UploadFile] = File(...), caption: str = Form("")
         await run_in_threadpool(_run)
     finally:
         tracker.clear()
+        empty_cache()
 
     return {
         "processed": processed,
@@ -389,7 +394,10 @@ async def remove_background(image: UploadFile = File(...)):
         model = registry.acquire('remove-background')
         return model(pil_image)
     
-    pil_image = await run_in_threadpool(_run)
+    try:
+        pil_image = await run_in_threadpool(_run)
+    finally:
+        empty_cache()
     buf = _save_with_exif(pil_image, "PNG")
     return StreamingResponse(buf, media_type="image/png")
 
