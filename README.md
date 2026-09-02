@@ -1,4 +1,4 @@
-![imgbox logo](frontend/src/assets/imgbox3.png)
+![imgbox logo](frontend/src/assets/02092026.png)
 
 ![CUDA](https://img.shields.io/badge/CUDA-supported-76B900?logo=nvidia&logoColor=white)
 ![MPS](https://img.shields.io/badge/Apple%20Silicon-MPS-black?logo=apple&logoColor=white)

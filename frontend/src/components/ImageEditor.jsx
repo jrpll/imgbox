@@ -181,7 +181,9 @@ export default function ImageEditor() {
     };
   }, [isLoading]);
 
+  const hydratedRef = useRef(false);
   useEffect(() => {
+    hydratedRef.current = false;
     setModeState(MODES[mode].initialState);
     setImages([]);
     setResult(null);
@@ -189,22 +191,36 @@ export default function ImageEditor() {
     let cancelled = false;
     (async () => {
       const saved = await loadState(mode);
-      if (cancelled || !saved) return;
-      const cfg = MODES[mode];
-      const merged = { ...cfg.initialState, ...(saved.modeState || {}) };
-      setModeState(cfg.restoreState ? cfg.restoreState(merged) : merged);
-      const restored = saved.images ?? (saved.image ? [saved.image] : []);
-      // Re-read into memory: a persisted File can still be a stale pointer to a file on disk.
-      const materialized = await Promise.all(
-        restored.map(async (f) => new File([await f.arrayBuffer()], f.name ?? 'image', { type: f.type }))
-      );
       if (cancelled) return;
-      if (materialized.length) setImages(materialized);
-      if (saved.result) setResult(URL.createObjectURL(saved.result));
-      if (saved.meta) setResultMeta(saved.meta);
+      if (saved) {
+        const cfg = MODES[mode];
+        const merged = { ...cfg.initialState, ...(saved.modeState || {}) };
+        setModeState(cfg.restoreState ? cfg.restoreState(merged) : merged);
+        const restored = saved.images ?? (saved.image ? [saved.image] : []);
+        // Re-read into memory: a persisted File can still be a stale pointer to a file on disk.
+        const materialized = await Promise.all(
+          restored.map(async (f) => new File([await f.arrayBuffer()], f.name ?? 'image', { type: f.type }))
+        );
+        if (cancelled) return;
+        if (materialized.length) setImages(materialized);
+        if (saved.result) setResult(URL.createObjectURL(saved.result));
+        if (saved.meta) setResultMeta(saved.meta);
+      }
+      hydratedRef.current = true;
     })();
     return () => { cancelled = true; };
   }, [mode]);
+
+  // Persist parameter tweaks without waiting for a Run; merge so images/result stay intact
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const id = setTimeout(() => {
+      loadState(mode)
+        .then((saved) => saveState(mode, { ...saved, modeState }))
+        .catch(err => console.error('saveState:', err));
+    }, 500);
+    return () => clearTimeout(id);
+  }, [mode, modeState]);
 
   useEffect(() => {
     return () => { if (result) URL.revokeObjectURL(result); };
