@@ -197,9 +197,7 @@ async def flux2klein(
     images: list[UploadFile] | None = File(None),
     prompt: str = Form(""),
     num_inference_steps: int = Form(50),
-    diffusion_coefficient: float = Form(0),
     num_images_per_prompt: int = Form(1),
-    seed: int | None = Form(None),
     width: int | None = Form(None),
     height: int | None = Form(None),
 ):
@@ -210,7 +208,7 @@ async def flux2klein(
             pil_images.append(Image.open(io.BytesIO(contents)).convert("RGB"))
     pil_image = pil_images if pil_images else None
 
-    print(f"flux2klein: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  diff_coef={diffusion_coefficient}  n={num_images_per_prompt}  seed={seed}  size={width}x{height}")
+    print(f"flux2klein: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  n={num_images_per_prompt}  size={width}x{height}")
 
     tracker.set("Loading", 0, num_inference_steps)
     t = tqdm(total=num_inference_steps, desc="Generating")
@@ -227,16 +225,14 @@ async def flux2klein(
             t.update(1)
             tracker.set_from_tqdm(t)
             return kwargs
-        torch_gen = torch.Generator().manual_seed(seed) if seed is not None else None
         return pipe(
             image=pil_image,
             prompt_embeds=prompt_embeds,
             negative_prompt_embeds=negative_prompt_embeds,
             num_inference_steps=num_inference_steps,
-            diffusion_norm=diffusion_coefficient,
+            diffusion_norm=0,
             num_images_per_prompt=num_images_per_prompt,
             callback_on_step_end=on_step,
-            generator=torch_gen,
             width=width,
             height=height,
         ).images
@@ -258,7 +254,6 @@ async def flux2klein_fast(
     images: list[UploadFile] | None = File(None),
     prompt: str = Form(""),
     num_images_per_prompt: int = Form(1),
-    seed: int | None = Form(None),
     width: int | None = Form(None),
     height: int | None = Form(None),
 ):
@@ -271,7 +266,7 @@ async def flux2klein_fast(
 
     num_inference_steps = 4
 
-    print(f"flux2klein-fast: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  n={num_images_per_prompt}  seed={seed}  size={width}x{height}")
+    print(f"flux2klein-fast: prompt={prompt!r}  images={len(pil_images)}  steps={num_inference_steps}  n={num_images_per_prompt}  size={width}x{height}")
 
     tracker.set("Loading", 0, num_inference_steps)
     t = tqdm(total=num_inference_steps, desc="Generating")
@@ -288,7 +283,6 @@ async def flux2klein_fast(
             t.update(1)
             tracker.set_from_tqdm(t)
             return kwargs
-        torch_gen = torch.Generator().manual_seed(seed) if seed is not None else None
         return pipe(
             image=pil_image,
             prompt_embeds=prompt_embeds,
@@ -297,7 +291,6 @@ async def flux2klein_fast(
             guidance_scale=1.0,
             num_images_per_prompt=num_images_per_prompt,
             callback_on_step_end=on_step,
-            generator=torch_gen,
             width=width,
             height=height,
         ).images

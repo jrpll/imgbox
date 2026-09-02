@@ -8,7 +8,6 @@ import flux2KleinMode from './Flux2Klein';
 const initialState = {
   prompt: '',
   numImagesPerPrompt: '',
-  seed: '',
   width: '',
   height: '',
 };
@@ -57,7 +56,6 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
       <AdvancedSettings>
       <div className="flex flex-col gap-4">
         {numField('numImagesPerPrompt', 'flux.num_images', '1', { min: '1' })}
-        {numField('seed', 'flux.seed', 'random')}
         {numField('width', 'flux.width', '1024')}
         {numField('height', 'flux.height', '1024')}
       </div>
@@ -71,7 +69,6 @@ async function submit({ images, state }) {
   for (const img of images) fd.append('images', img);
   fd.append('prompt', state.prompt);
   if (Number.isInteger(state.numImagesPerPrompt)) fd.append('num_images_per_prompt', state.numImagesPerPrompt);
-  if (Number.isInteger(state.seed)) fd.append('seed', state.seed);
   if (Number.isInteger(state.width)) fd.append('width', state.width);
   if (Number.isInteger(state.height)) fd.append('height', state.height);
   const r = await apiPost('/flux2klein-fast', fd);

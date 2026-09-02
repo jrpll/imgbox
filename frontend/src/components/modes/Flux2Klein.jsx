@@ -8,9 +8,7 @@ import AdvancedSettings from '../AdvancedSettings';
 const initialState = {
   prompt: '',
   numInferenceSteps: '',
-  diffusionCoefficient: '',
   numImagesPerPrompt: '',
-  seed: '',
   width: '',
   height: '',
 };
@@ -53,17 +51,6 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
           />
         </div>
         <div className="group flex flex-col gap-1">
-          <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.diffusion_coefficient')}</span>
-          <input
-            type="number"
-            step="0.1"
-            placeholder="0"
-            value={state.diffusionCoefficient}
-            onChange={(e) => set({ diffusionCoefficient: e.target.value === '' ? '' : parseFloat(e.target.value) })}
-            className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
-          />
-        </div>
-        <div className="group flex flex-col gap-1">
           <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.num_images')}</span>
           <input
             type="number"
@@ -71,16 +58,6 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             placeholder="1"
             value={state.numImagesPerPrompt}
             onChange={(e) => set({ numImagesPerPrompt: e.target.value === '' ? '' : parseInt(e.target.value) })}
-            className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
-          />
-        </div>
-        <div className="group flex flex-col gap-1">
-          <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.seed')}</span>
-          <input
-            type="number"
-            placeholder="random"
-            value={state.seed}
-            onChange={(e) => set({ seed: e.target.value === '' ? '' : parseInt(e.target.value) })}
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
@@ -115,9 +92,7 @@ async function submit({ images, state }) {
   for (const img of images) fd.append('images', img);
   fd.append('prompt', state.prompt);
   if (Number.isInteger(state.numInferenceSteps)) fd.append('num_inference_steps', state.numInferenceSteps);
-  if (Number.isFinite(state.diffusionCoefficient)) fd.append('diffusion_coefficient', state.diffusionCoefficient);
   if (Number.isInteger(state.numImagesPerPrompt)) fd.append('num_images_per_prompt', state.numImagesPerPrompt);
-  if (Number.isInteger(state.seed)) fd.append('seed', state.seed);
   if (Number.isInteger(state.width)) fd.append('width', state.width);
   if (Number.isInteger(state.height)) fd.append('height', state.height);
   const r = await apiPost('/flux2klein', fd);
