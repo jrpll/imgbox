@@ -219,9 +219,9 @@ async def flux2klein(
         p_encoder = registry.acquire('flux2klein_pe')
         with torch.no_grad():
             prompt_embeds, _ = p_encoder.encode_prompt(prompt)
-            negative_prompt_embeds, _ = p_encoder.encode_prompt(prompt="") 
+            negative_prompt_embeds, _ = p_encoder.encode_prompt(prompt="")
         del p_encoder
-        torch.cuda.empty_cache()
+        empty_cache()
         pipe = registry.acquire('flux2klein')
         def on_step(_pipe, step_index, _timestep, kwargs):
             t.update(1)
@@ -277,6 +277,12 @@ async def flux2klein_fast(
     t = tqdm(total=num_inference_steps, desc="Generating")
 
     def _run():
+        p_encoder = registry.acquire('flux2klein_pe')
+        with torch.no_grad():
+            prompt_embeds, _ = p_encoder.encode_prompt(prompt)
+            negative_prompt_embeds, _ = p_encoder.encode_prompt(prompt="")
+        del p_encoder
+        empty_cache()
         pipe = registry.acquire('flux2klein-fast')
         def on_step(_pipe, step_index, _timestep, kwargs):
             t.update(1)
@@ -285,7 +291,8 @@ async def flux2klein_fast(
         torch_gen = torch.Generator().manual_seed(seed) if seed is not None else None
         return pipe(
             image=pil_image,
-            prompt=prompt,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
             num_inference_steps=num_inference_steps,
             guidance_scale=1.0,
             num_images_per_prompt=num_images_per_prompt,
