@@ -40,6 +40,8 @@ Run this command to grab up-to-date code and install locally:
 git fetch origin && git reset --hard origin/main && bash install.sh
 ```
 
+Please note this overrides any local change you may have done to the code.
+
 ## Testing
 
 For development, you can start backend like this:
@@ -55,8 +57,6 @@ cd frontend && npm run dev
 ```
 
 To emulate a brand-new user installing from scratch (Docker + GPU, real model download), see [docs/clean-install-test.md](docs/clean-install-test.md).
-
-Please note this overrides any local change you may have done to the code.
 
 ---
 
