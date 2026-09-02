@@ -49,6 +49,16 @@ cd frontend && npm run dev
 
 To emulate a brand-new user installing from scratch (Docker + GPU, real model download), see [docs/clean-install-test.md](docs/clean-install-test.md).
 
+## Updating
+
+Run this command to grab up-to-date code and install locally: 
+
+```bash
+git fetch origin && git reset --hard origin/main && bash install.sh
+```
+
+Please note this overrides any local change you may have done to the code.
+
 ---
 
 If imgbox is useful to you, a ⭐ goes a long way.
