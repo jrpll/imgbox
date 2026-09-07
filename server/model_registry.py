@@ -77,7 +77,8 @@ class ModelRegistry:
         pipe = Flux2KleinPipeline.from_pretrained(
                 "black-forest-labs/FLUX.2-klein-4B",
                 torch_dtype=DTYPE,
-                token=os.getenv("HUGGING_FACE_TOKEN")
+                token=os.getenv("HUGGING_FACE_TOKEN"),
+                text_encoder=None
         ).to(DEVICE)
         return pipe
 
