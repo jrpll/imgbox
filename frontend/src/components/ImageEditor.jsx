@@ -72,6 +72,21 @@ export default function ImageEditor() {
     localStorage.setItem('imgbox:theme', dark ? 'dark' : 'light');
   }, [dark]);
 
+  // Scrollbar thumbs are transparent until an area is actually scrolled (see index.css);
+  // drop the marker once it has been still for a beat so the bar fades back out.
+  useEffect(() => {
+    const timers = new WeakMap();
+    const onScroll = (e) => {
+      const el = e.target;
+      if (!(el instanceof Element)) return;
+      el.setAttribute('data-scrolling', '');
+      clearTimeout(timers.get(el));
+      timers.set(el, setTimeout(() => el.removeAttribute('data-scrolling'), 900));
+    };
+    document.addEventListener('scroll', onScroll, true);
+    return () => document.removeEventListener('scroll', onScroll, true);
+  }, []);
+
   const modeConfig = MODES[mode];
   const canRun = !isLoading && modeConfig.canSubmit({ images, state: modeState });
 

@@ -60,6 +60,55 @@ input[type="number"] {
 }
 
 
+/* Scrollbars keep their track reserved at all times (so revealing one never reflows
+   the content) but paint the thumb only while the area is being scrolled or pointed
+   at — ImageEditor sets data-scrolling and drops it once the area has been still. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*[data-scrolling] {
+  scrollbar-color: rgb(209, 213, 219) transparent;
+}
+
+html.dark *[data-scrolling] {
+  scrollbar-color: rgb(82, 82, 91) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+  transition: background 400ms ease;
+}
+
+*[data-scrolling]::-webkit-scrollbar-thumb {
+  background: rgb(209, 213, 219); /* gray-300 */
+}
+
+html.dark *[data-scrolling]::-webkit-scrollbar-thumb {
+  background: rgb(82, 82, 91); /* zinc-600 */
+}
+
+/* Last, so grabbing the thumb keeps it visible even when a drag stops producing
+   scroll events (dragging past the end). */
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(156, 163, 175); /* gray-400 */
+}
+
+html.dark *::-webkit-scrollbar-thumb:hover {
+  background: rgb(113, 113, 122); /* zinc-500 */
+}
+
 
 @layer components {
   .input-textarea {
