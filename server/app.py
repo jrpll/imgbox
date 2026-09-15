@@ -35,6 +35,7 @@ from device import DEVICE, empty_cache
 from model_registry import ModelRegistry
 from progress import tracker
 import identity_store
+import sam3_segmenter
 
 registry = ModelRegistry()
 
@@ -408,6 +409,41 @@ async def remove_background(image: UploadFile = File(...)):
         empty_cache()
     buf = _save_with_exif(pil_image, "PNG")
     return StreamingResponse(buf, media_type="image/png")
+
+@app.post("/sam3")
+async def sam3(
+    image: UploadFile = File(...),
+    points: str = Form("[]"),
+    labels: str = Form("[]"),
+    text: str = Form(""),
+    preserve: bool = Form(False),
+):
+    """Points come from clicks (one call per click, no Run step); text comes from Run.
+
+    They are separate SAM3 heads, so a request carries one or the other, not both.
+    """
+    contents = await image.read()
+    pts, lbls = json.loads(points), json.loads(labels)
+    if len(pts) != len(lbls):
+        raise HTTPException(status_code=400, detail="points and labels must be the same length")
+    if not pts and not text.strip():
+        raise HTTPException(status_code=400, detail="need either points or a text prompt")
+    pil_image = Image.open(io.BytesIO(contents)).convert("RGB")
+
+    def _run():
+        segmenter = registry.acquire('sam3')
+        if pts:
+            return segmenter.mask(pil_image, pts, lbls)
+        return segmenter.mask_from_text(pil_image, text.strip())
+
+    try:
+        mask = await run_in_threadpool(_run)
+    finally:
+        empty_cache()
+
+    cut = sam3_segmenter.cutout(pil_image, ~mask if preserve else mask)
+    return StreamingResponse(_save_with_exif(cut, "PNG"), media_type="image/png")
+
 
 # ---------------------------------------------------------------------------
 # Frontend (built SPA) — mounted last so API routes take precedence

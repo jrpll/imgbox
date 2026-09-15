@@ -15,6 +15,7 @@ class ModelRegistry:
             'flux2klein_pe': self._load_flux2klein_pe,
             'flux2klein-fast': self._load_flux2klein_fast,
             'identity': self._load_identity,
+            'sam3': self._load_sam3,
         }
         self._current_name: str | None = None
         self._current_model: Any | None = None
@@ -96,3 +97,7 @@ class ModelRegistry:
     def _load_identity(self):
         from identity import IdentityModel
         return IdentityModel()
+
+    def _load_sam3(self):
+        from sam3_segmenter import Sam3Segmenter
+        return Sam3Segmenter()

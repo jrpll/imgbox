@@ -6,6 +6,7 @@ import { apiPost, apiGet, apiDelete, apiEventSource } from '../lib/api';
 import { loadState, saveState, clearState } from '../lib/persist';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
+import sam3Mode from './modes/Sam3';
 import flux2KleinMode from './modes/Flux2Klein';
 import flux2KleinFastMode from './modes/Flux2KleinFast';
 import identityMode from './modes/Identity';
@@ -13,6 +14,7 @@ import identityMode from './modes/Identity';
 const MODES = {
   'edit': editMode,
   'remove-background': removeBackgroundMode,
+  'sam3': sam3Mode,
   'flux2klein': flux2KleinMode,
   'flux2klein-fast': flux2KleinFastMode,
   'identity': identityMode,
@@ -249,6 +251,12 @@ export default function ImageEditor() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Modes whose output updates as you interact push it straight up, without a Run step.
+  const handleLiveResult = (blob) => {
+    setResult(blob ? URL.createObjectURL(blob) : null);
+    setResultMeta(null);
   };
 
   const handleReset = async () => {
@@ -488,7 +496,7 @@ export default function ImageEditor() {
                   type="button"
                   onClick={() => setModeState((s) => ({ ...s, step: s.step - 1 }))}
                   disabled={modeState.step === 1}
-                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
                 >
                   <ArrowLeft size={15} />
                 </button>
@@ -496,7 +504,7 @@ export default function ImageEditor() {
                   type="button"
                   onClick={() => setModeState((s) => ({ ...s, step: s.step + 1 }))}
                   disabled={modeState.step === modeConfig.totalSteps}
-                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
                 >
                   <ArrowRight size={15} />
                 </button>
@@ -512,6 +520,7 @@ export default function ImageEditor() {
               images={images}
               setImages={setImages}
               onZoom={setLightbox}
+              onResult={handleLiveResult}
             />
           </div>
 
@@ -520,7 +529,7 @@ export default function ImageEditor() {
             <button
               type="button"
               onClick={handleReset}
-              className="px-4 h-9 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-[transform,background-color] active:scale-[0.96]"
+              className={`px-4 h-9 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-[transform,background-color] active:scale-[0.96]`}
             >
               {t('common.reset')}
             </button>
@@ -531,7 +540,7 @@ export default function ImageEditor() {
               className={`relative flex-1 h-9 text-sm font-medium rounded text-white transition-[transform,background-color] after:absolute after:content-[''] after:inset-x-0 after:-inset-y-2 ${
                 isLoading
                   ? 'bg-[#bce4ff] cursor-wait'
-                  : 'bg-[#0ea0ff] hover:bg-blue-500 active:scale-[0.96] disabled:opacity-40 disabled:cursor-not-allowed'
+                  : 'bg-[#0ea0ff] hover:bg-blue-500 active:scale-[0.96] disabled:opacity-40'
               }`}
             >
               {isLoading && (
@@ -693,7 +702,7 @@ export default function ImageEditor() {
                     type="button"
                     onClick={() => setMatchIndex(i => Math.max(0, i - 1))}
                     disabled={matchIndex === 0}
-                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
                   >
                     <ArrowLeft size={15} />
                   </button>
@@ -702,7 +711,7 @@ export default function ImageEditor() {
                     type="button"
                     onClick={() => setMatchIndex(i => Math.min(total - 1, i + 1))}
                     disabled={matchIndex === total - 1}
-                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
                   >
                     <ArrowRight size={15} />
                   </button>

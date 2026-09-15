@@ -52,7 +52,8 @@ frontend/src/
 │       ├── Edit.jsx             # 'edit': two-step FINEdits flow (train+invert, then slider edits)
 │       ├── Flux2Klein.jsx       # 'flux2klein': prompt + optional reference images
 │       ├── Identity.jsx         # 'identity': batch face embedding into the database
-│       └── RemoveBackground.jsx # 'remove background': image in, PNG out
+│       ├── RemoveBackground.jsx # 'remove background': image in, PNG out
+│       └── Sam3.jsx             # 'sam3': click points on the image, SAM3 cuts them out live (no Run)
 └── lib/
     ├── api.js               # Fetch wrapper — base URL from Tauri store / VITE_API_URL,
     │                          falls back to 127.0.0.1:8080 (5173 → 8080 special-case)
@@ -67,6 +68,7 @@ server/
 ├── identity.py              # Face detection + embedding model (insightface/ONNX)
 ├── identity_store.py        # LanceDB table + crop/original image files on disk
 ├── background_remover.py    # Background removal model
+├── sam3_segmenter.py        # SAM3 interactive point segmentation (external package, see below)
 ├── progress.py              # Global progress tracker → /progress SSE
 └── device.py                # DEVICE resolution (cuda → mps → cpu) + empty_cache()
 
@@ -86,6 +88,7 @@ Each file under `components/modes/` exports a config object. `ImageEditor.jsx` o
   Inputs: ({ state, setState, images, setImages, onZoom }) => JSX,
   submit: async ({ images, state }) => ({ blob?, state, meta? }),
   canSubmit: ({ images, state }) => boolean,
+  hideRun?: boolean,        // live modes: no Run button, Inputs pushes results via onResult
   totalSteps?: number,      // multi-step modes: shell renders step arrows
   getStepLabel?: (state, t) => string,
   Result?: ({ result, meta, onZoom }) => JSX,  // custom result card (identity grid)
@@ -99,6 +102,10 @@ Notes:
 - `submit` returns `blob` (result image) and/or `meta` (arbitrary JSON, rendered by `Result`).
 - Modes do not use refs and do not plumb readiness up via callbacks — derive from state.
 - Multi-step modes keep `step` in their state; the shell's arrows write `state.step` directly.
+- A mode whose output updates continuously rather than on demand sets `hideRun: true`: the shell
+  drops the Run button (and the Cmd+Enter binding) and hands `Inputs` an `onResult(blob | null)`
+  that writes straight into the shared result card. `submit` is then never called, and nothing is
+  persisted on submit either — such a mode gets only the debounced `modeState` save.
 
 Per-mode last state (`modeState`, image blobs, result blob, meta) is persisted to IndexedDB on every successful submit and rehydrated when the mode is opened. If rehydration needs adjusting — e.g. resetting multi-step progress because the server's in-memory model state doesn't survive restarts — the mode exports `restoreState`. The `edit` mode uses this to snap back to step 1 with `trained: false`, since the slider depends on the fine-tuned transformer + `zts_ref` that live only in server RAM.
 
@@ -106,7 +113,7 @@ To add a mode: drop a new file under `components/modes/`, register it in the `MO
 
 ### Model registry (server)
 
-`model_registry.py` holds **one model on the GPU at a time** ('edit', 'flux2klein', 'identity', 'remove-background'). `registry.acquire(name)` unloads the current model and loads the requested one. Consequences:
+`model_registry.py` holds **one model on the GPU at a time** ('edit', 'flux2klein', 'identity', 'remove-background', 'sam3'). `registry.acquire(name)` unloads the current model and loads the requested one. Consequences:
 
 - Switching modes evicts the FINEdits instance, destroying the fine-tuned transformer + `zts_ref` — a subsequent `/edit` hits a fresh instance and 500s. The frontend's `restoreState` mitigates across restarts, but not across mode switches within a session.
 - The lock only guards load/swap, not use — concurrent ML requests are unsafe (known limitation, single-user app).
@@ -146,6 +153,7 @@ The fine-tuned transformer state persists in memory between `/generate` and subs
 | `DELETE /identity/{id}` | — | `{ ok }` |
 | `GET /identity/match/{id}?k=` | — | k nearest-neighbor rows |
 | `POST /remove-background` | multipart: `image` | PNG blob |
+| `POST /sam3` | multipart: `image`, `points` (JSON `[[x,y],…]`, normalized), `labels` (JSON `[1,0,…]`), `preserve?` | RGBA PNG — the selection cut out (or kept, with `preserve`) |
 | `POST /config` | form: `hf_token` | `{ ok }` — writes `server/.env` |
 | `GET /progress` | — | SSE stream `{ message, progress, remaining }` (single global tracker) |
 | `GET /health` | — | `{"status": "ready" \| "loading", "device": "cuda" \| "mps"}`; 503 if CPU-only |
@@ -157,6 +165,32 @@ Result images get imgbox EXIF tags (Software + DateTime) via `_save_with_exif`.
 ## Tauri (low priority for now)
 
 Commands exposed via `invoke`: `get_server_config` (the only one the frontend currently calls), `set_server_config`, `read_file`. Two intended modes: `local` (sidecar, needs GPU) and `remote` (user-hosted FastAPI). The sidecar lifecycle, token-to-sidecar flow, and `read_file`-based drag-drop are all unfinished — known and deferred until the webapp is solid.
+
+---
+
+## SAM3 (sam3_segmenter.py)
+
+The `sam3` package is **not vendored and not a pip dependency** — `sam3_segmenter.py` puts
+`SAM3_PKG` on `sys.path` and loads the checkpoint at `SAM3_CKPT` (both env-overridable;
+they default to `/home_pers/jripoll/flux2-sde-sampling`). If the checkpoint is missing the
+builder falls back to downloading `facebook/sam3` from HuggingFace. Its Python deps
+(`eva-decord`, `einops`, `ftfy`, `iopath`, `pycocotools`, `setuptools<81` for `pkg_resources`)
+*are* in `server/pyproject.toml`, since sam3 imports them at module scope.
+
+`model.inst_interactive_predictor` is the point-prompt head, but it has **no backbone of its
+own** — `build_tracker` is called with `with_backbone=False`, so `predictor.set_image()` raises
+`AttributeError: 'NoneType' object has no attribute 'forward_image'`. The working path is
+`Sam3Processor.set_image(img)` (runs the detector's shared backbone and prepares
+`sam2_backbone_out`) followed by `model.predict_inst(state, point_coords=…, point_labels=…)`.
+
+The per-image `inference_state` is cached on the segmenter, keyed by an md5 of the pixel
+buffer, so successive clicks on the same image only re-run the mask decoder. Mode switching
+evicts the instance and drops that cache (it is rebuilt on the next call — unlike FINEdits,
+nothing is lost but time).
+
+The mode has no Run step (`hideRun`): each click POSTs to `/sam3` and the returned cutout is
+both the result card's image and — stacked over a 50%-opacity blue wash, opaque wherever it
+was kept — the selection preview in the input panel, so one request drives both.
 
 ---
 

@@ -136,7 +136,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
               value={state.slider}
               disabled={locked}
               onChange={(e) => set({ slider: parseFloat(e.target.value) })}
-              className="w-full accent-[#0ea0ff] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full accent-[#0ea0ff] disabled:opacity-40"
             />
           </div>
         </>
