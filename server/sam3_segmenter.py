@@ -4,7 +4,7 @@ import sys
 
 import numpy as np
 import torch
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from device import DEVICE
 
@@ -43,8 +43,18 @@ class Sam3Segmenter:
         return self._state
 
     @torch.inference_mode()
-    def mask(self, image: Image.Image, points, labels) -> np.ndarray:
-        """points: normalized (x, y) in [0, 1]. labels: 1 = select, 0 = exclude."""
+    def mask(self, image: Image.Image, points, labels, additive=False) -> np.ndarray:
+        """points: normalized (x, y) in [0, 1]. labels: 1 = select, 0 = exclude.
+
+        additive: each point is segmented on its own and folded in click order — a select
+        point adds its object to the mask so far, an exclude point removes its object.
+        """
+        if additive:
+            out = np.zeros((image.height, image.width), dtype=bool)
+            for p, l in zip(points, labels):
+                m = self.mask(image, [p], [1])
+                out = out | m if l else out & ~m
+            return out
         state = self._image_state(image)
         scale = np.array(image.size, dtype=np.float32)
         masks, ious, _ = self.model.predict_inst(
@@ -61,11 +71,33 @@ class Sam3Segmenter:
 
         Empty when nothing clears the confidence threshold, which cuts nothing out.
         """
-        state = self.processor.set_text_prompt(prompt=text, state=self._image_state(image))
+        state = self._image_state(image)
+        # The vision backbone's FlashAttention-3 kernel returns bf16 whatever it is fed
+        # (sam3/perflib/fa3.py), while every parameter is fp32 — so the grounding head's
+        # LayerNorm sees bf16 activations against an fp32 weight and raises. SAM3's own
+        # video predictor sidesteps this by running the model under bf16 autocast; the
+        # point head needs no such thing, its decoder is fed through predict_inst.
+        with torch.autocast(device_type=DEVICE, dtype=torch.bfloat16):
+            state = self.processor.set_text_prompt(prompt=text, state=state)
         masks = state["masks"]
         if masks.shape[0] == 0:
             return np.zeros((image.height, image.width), dtype=bool)
         return masks.any(dim=0).squeeze(0).cpu().numpy()
+
+
+def erase_mask(size, strokes) -> np.ndarray:
+    """Eraser strokes rasterized: points normalized like the clicks, radius `r` a fraction of the width."""
+    w, h = size
+    img = Image.new("L", size, 0)
+    draw = ImageDraw.Draw(img)
+    for stroke in strokes:
+        r = stroke["r"] * w
+        pts = [(x * w, y * h) for x, y in stroke["pts"]]
+        draw.line(pts, fill=255, width=round(2 * r))
+        # PIL lines have flat ends and no joins; a disc at every point rounds them off.
+        for x, y in pts:
+            draw.ellipse((x - r, y - r, x + r, y + r), fill=255)
+    return np.array(img) > 0
 
 
 def cutout(image: Image.Image, mask: np.ndarray) -> Image.Image:

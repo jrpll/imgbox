@@ -93,6 +93,8 @@ Each file under `components/modes/` exports a config object. `ImageEditor.jsx` o
   getStepLabel?: (state, t) => string,
   Result?: ({ result, meta, onZoom }) => JSX,  // custom result card (identity grid)
   restoreState?: (state) => state,  // massage persisted state on rehydrate
+  model?: string,           // registry name: loaded explicitly — Run reads Load model until then,
+                            //   header shows a loaded/not-loaded dot, Inputs gets `loaded`
 }
 ```
 
@@ -153,10 +155,11 @@ The fine-tuned transformer state persists in memory between `/generate` and subs
 | `DELETE /identity/{id}` | — | `{ ok }` |
 | `GET /identity/match/{id}?k=` | — | k nearest-neighbor rows |
 | `POST /remove-background` | multipart: `image` | PNG blob |
-| `POST /sam3` | multipart: `image`, `points` (JSON `[[x,y],…]`, normalized), `labels` (JSON `[1,0,…]`), `preserve?` | RGBA PNG — the selection cut out (or kept, with `preserve`) |
+| `POST /load/{name}` | — | `{ ok }` — `registry.acquire(name)`; the shell's Load model button for modes with `model` |
+| `POST /sam3` | multipart: `image`, `points` (JSON `[[x,y],…]`, normalized), `labels` (JSON `[1,0,…]`), `preserve?`, `additive?` (each point segmented alone; label 1 adds its mask, 0 subtracts it, in click order) | RGBA PNG — the selection cut out (or kept, with `preserve`) |
 | `POST /config` | form: `hf_token` | `{ ok }` — writes `server/.env` |
 | `GET /progress` | — | SSE stream `{ message, progress, remaining }` (single global tracker) |
-| `GET /health` | — | `{"status": "ready" \| "loading", "device": "cuda" \| "mps"}`; 503 if CPU-only |
+| `GET /health` | — | `{"status": "ready" \| "loading", "device": "cuda" \| "mps", "model": <registry name> \| null}`; 503 if CPU-only |
 
 Result images get imgbox EXIF tags (Software + DateTime) via `_save_with_exif`.
 

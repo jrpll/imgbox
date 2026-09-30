@@ -27,6 +27,7 @@ export default function ImageEditor() {
   const [result, setResult] = useState(null);
   const [resultMeta, setResultMeta] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [modelLoaded, setModelLoaded] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressBar, setProgressBar] = useState({ target: 0, duration: 200 });
   const [progressMessage, setProgressMessage] = useState('');
@@ -88,7 +89,9 @@ export default function ImageEditor() {
   }, []);
 
   const modeConfig = MODES[mode];
-  const canRun = !isLoading && modeConfig.canSubmit({ images, state: modeState });
+  // Modes that name a registry `model` load it explicitly: until then the Run button is Load model.
+  const needsLoad = !!modeConfig.model && !modelLoaded;
+  const canRun = !isLoading && (needsLoad || modeConfig.canSubmit({ images, state: modeState }));
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -228,6 +231,18 @@ export default function ImageEditor() {
     return () => { cancelled = true; };
   }, [mode]);
 
+  // The model may still be on the GPU from an earlier visit, or evicted by another mode since.
+  useEffect(() => {
+    setModelLoaded(false);
+    const name = MODES[mode].model;
+    if (!name) return;
+    let cancelled = false;
+    apiGet('/health')
+      .then((h) => { if (!cancelled) setModelLoaded(h.model === name); })
+      .catch((err) => console.error('health:', err));
+    return () => { cancelled = true; };
+  }, [mode]);
+
   // Persist parameter tweaks without waiting for a Run; merge so images/result stay intact
   useEffect(() => {
     if (!hydratedRef.current) return;
@@ -268,6 +283,18 @@ export default function ImageEditor() {
     }
   };
 
+  const handleLoad = async () => {
+    setIsLoading(true);
+    try {
+      await apiPost(`/load/${modeConfig.model}`);
+      setModelLoaded(true);
+    } catch (err) {
+      console.error('Error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Modes whose output updates as you interact push it straight up, without a Run step.
   const handleLiveResult = (blob) => {
     setResult(blob ? URL.createObjectURL(blob) : null);
@@ -282,14 +309,16 @@ export default function ImageEditor() {
     await clearState(mode);
   };
 
+  const handleRun = needsLoad ? handleLoad : handleSubmit;
+
   // Cmd/Ctrl+Enter to run — ref keeps the listener pointed at the latest state without re-binding
-  const runRef = useRef({ canRun, handleSubmit });
-  runRef.current = { canRun, handleSubmit };
+  const runRef = useRef({ canRun, handleRun });
+  runRef.current = { canRun, handleRun };
   useEffect(() => {
     const onKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
-        if (runRef.current.canRun) runRef.current.handleSubmit();
+        if (runRef.current.canRun) runRef.current.handleRun();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -339,6 +368,12 @@ export default function ImageEditor() {
         >
           {t('common.database')}
         </button>
+        {modeConfig.model && (
+          <span className={`ml-2 flex items-center gap-1.5 text-sm transition-colors ${modelLoaded ? 'text-[#0ea0ff]' : 'text-gray-400'}`}>
+            <span className={`w-2 h-2 rounded-full transition-colors ${modelLoaded ? 'bg-[#0ea0ff]' : 'bg-gray-300 dark:bg-zinc-600'}`} />
+            {t(modelLoaded ? 'common.model_loaded' : 'common.model_not_loaded')}
+          </span>
+        )}
         <div className="ml-auto self-center" ref={settingsRef}>
           <button
             onClick={() => setSettingsOpen(o => !o)}
@@ -536,6 +571,7 @@ export default function ImageEditor() {
               setImages={setImages}
               onZoom={setLightbox}
               onResult={handleLiveResult}
+              loaded={modelLoaded}
             />
           </div>
 
@@ -550,7 +586,7 @@ export default function ImageEditor() {
             </button>
             <button
               type="button"
-              onClick={handleSubmit}
+              onClick={handleRun}
               disabled={!canRun}
               className={`relative flex-1 h-9 text-sm font-medium rounded text-white transition-[transform,background-color] after:absolute after:content-[''] after:inset-x-0 after:-inset-y-2 ${
                 isLoading
@@ -567,7 +603,7 @@ export default function ImageEditor() {
                 </span>
               )}
               <span className="relative flex h-full items-center justify-center gap-2">
-                {isLoading ? t('progress.' + (progressMessage || 'Loading')) : t('common.run')}
+                {isLoading ? t('progress.' + (progressMessage || 'Loading')) : t(needsLoad ? 'common.load_model' : 'common.run')}
                 {isLoading && remaining && (
                   <span className="opacity-70">· {remaining} {t('common.left')}</span>
                 )}

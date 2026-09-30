@@ -85,7 +85,7 @@ async def set_config(hf_token: str = Form(...)):
 async def health():
     if DEVICE == "cpu":
         raise HTTPException(status_code=503, detail={"status": "no_accelerator", "device": "cpu"})
-    return {"status": "ready" if registry.current() else "loading", "device": DEVICE}
+    return {"status": "ready" if registry.current() else "loading", "device": DEVICE, "model": registry.current()}
 
 
 # ---------------------------------------------------------------------------
@@ -410,6 +410,12 @@ async def remove_background(image: UploadFile = File(...)):
     buf = _save_with_exif(pil_image, "PNG")
     return StreamingResponse(buf, media_type="image/png")
 
+@app.post("/load/{name}")
+async def load(name: str):
+    """The Load model button of modes that load explicitly (see `model` in the mode config)."""
+    await run_in_threadpool(registry.acquire, name)
+    return {"ok": True}
+
 @app.post("/sam3")
 async def sam3(
     image: UploadFile = File(...),
@@ -417,6 +423,8 @@ async def sam3(
     labels: str = Form("[]"),
     text: str = Form(""),
     preserve: bool = Form(False),
+    additive: bool = Form(False),
+    erase: str = Form("[]"),
 ):
     """Points come from clicks (one call per click, no Run step); text comes from Run.
 
@@ -433,7 +441,7 @@ async def sam3(
     def _run():
         segmenter = registry.acquire('sam3')
         if pts:
-            return segmenter.mask(pil_image, pts, lbls)
+            return segmenter.mask(pil_image, pts, lbls, additive)
         return segmenter.mask_from_text(pil_image, text.strip())
 
     try:
@@ -441,7 +449,9 @@ async def sam3(
     finally:
         empty_cache()
 
-    cut = sam3_segmenter.cutout(pil_image, ~mask if preserve else mask)
+    # Eraser strokes go last: whatever they cover is removed, whichever way preserve points.
+    removed = (~mask if preserve else mask) | sam3_segmenter.erase_mask(pil_image.size, json.loads(erase))
+    cut = sam3_segmenter.cutout(pil_image, removed)
     return StreamingResponse(_save_with_exif(cut, "PNG"), media_type="image/png")
 
 
