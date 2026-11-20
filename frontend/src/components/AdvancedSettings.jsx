@@ -4,12 +4,17 @@ import { useLang } from '../lib/i18n';
 
 export default function AdvancedSettings({ children }) {
   const { t } = useLang();
-  const [open, setOpen] = useState(false);
+  // Stays the way it was left, across modes and reloads.
+  const [open, setOpen] = useState(() => localStorage.getItem('imgbox:advanced') === 'true');
+  const toggle = () => {
+    localStorage.setItem('imgbox:advanced', String(!open));
+    setOpen(!open);
+  };
   return (
     <div className="flex flex-col gap-4">
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={toggle}
         className="flex items-center justify-between w-full text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
       >
         {t('common.advanced')}

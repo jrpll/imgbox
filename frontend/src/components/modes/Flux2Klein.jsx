@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Download, Image as ImageIcon } from '@phosphor-icons/react';
-import { apiPost } from '../../lib/api';
+import { X, Download, ArrowBendUpRight, Image as ImageIcon } from '@phosphor-icons/react';
 import { useLang } from '../../lib/i18n';
 import ImageDropZone from '../ImageDropZone';
 import AdvancedSettings from '../AdvancedSettings';
@@ -11,6 +10,7 @@ const initialState = {
   numImagesPerPrompt: '',
   width: '',
   height: '',
+  seed: '',
 };
 
 function Inputs({ state, setState, images, setImages, onZoom }) {
@@ -28,6 +28,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             value={state.prompt}
             onChange={(e) => set({ prompt: e.target.value })}
             rows={3}
+            placeholder={t('flux.prompt_example')}
             className="input-textarea"
           />
           {state.prompt && (
@@ -81,13 +82,22 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
           />
         </div>
+        <div className="group flex flex-col gap-1">
+          <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('flux.seed')}</span>
+          <input
+            type="number"
+            value={state.seed}
+            onChange={(e) => set({ seed: e.target.value === '' ? '' : parseInt(e.target.value) })}
+            className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500"
+          />
+        </div>
       </div>
       </AdvancedSettings>
     </div>
   );
 }
 
-async function submit({ images, state }) {
+async function submit({ images, state, run }) {
   const fd = new FormData();
   for (const img of images) fd.append('images', img);
   fd.append('prompt', state.prompt);
@@ -95,7 +105,8 @@ async function submit({ images, state }) {
   if (Number.isInteger(state.numImagesPerPrompt)) fd.append('num_images_per_prompt', state.numImagesPerPrompt);
   if (Number.isInteger(state.width)) fd.append('width', state.width);
   if (Number.isInteger(state.height)) fd.append('height', state.height);
-  const r = await apiPost('/flux2klein', fd);
+  if (Number.isInteger(state.seed)) fd.append('seed', state.seed);
+  const r = await run('/flux2klein', fd);
   const { images: b64s } = await r.json();
   const blobs = await Promise.all(
     b64s.map((b) => fetch(`data:image/jpeg;base64,${b}`).then((res) => res.blob()))
@@ -105,7 +116,8 @@ async function submit({ images, state }) {
 
 const canSubmit = ({ state }) => !!state.prompt;
 
-function Result({ meta, onZoom }) {
+function Result({ meta, onZoom, onSend }) {
+  const { t } = useLang();
   const blobs = meta?.images || [];
   const [urls, setUrls] = useState([]);
   const [aspects, setAspects] = useState({});
@@ -153,14 +165,25 @@ function Result({ meta, onZoom }) {
                   onClick={() => onZoom(url)}
                   className="block w-full h-full object-contain rounded cursor-zoom-in"
                 />
+                {onSend && (
+                  <button
+                    type="button"
+                    onClick={() => onSend(blobs[i])}
+                    title={t('common.send_to')}
+                    className="absolute top-1 right-10 flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                  >
+                    <ArrowBendUpRight size={13} />
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
                     const link = document.createElement('a');
                     link.href = url;
-                    link.download = `generated-${i + 1}.png`;
+                    link.download = `generated-${i + 1}.jpg`;
                     link.click();
                   }}
+                  title={t('common.download')}
                   className="absolute top-1 right-1 flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 opacity-0 group-hover/thumb:opacity-100 transition-opacity"
                 >
                   <Download size={13} />
@@ -176,9 +199,13 @@ function Result({ meta, onZoom }) {
 
 export default {
   label: 'mode.flux2klein',
+  // With reference images it edits them; without, it generates.
+  tasks: ['generate', 'edit'],
+  model: 'flux2klein',
   initialState,
   Inputs,
   Result,
   submit,
   canSubmit,
+  multi: true,
 };

@@ -687,6 +687,8 @@ class Flux2KleinVPSDEPipeline(DiffusionPipeline, Flux2LoraLoaderMixin):
         max_sequence_length: int = 512,
         text_encoder_out_layers: Tuple[int] = (9, 18, 27),
         diffusion_norm: float = 8.0,
+        init_image: Optional[PIL.Image.Image] = None,
+        strength: float = 1.0,
     ):
         # 1. Check inputs
         self.check_inputs(
@@ -776,6 +778,14 @@ class Flux2KleinVPSDEPipeline(DiffusionPipeline, Flux2LoraLoaderMixin):
             latents=latents,
         )
 
+        # SDEdit: start from `init_image` noised to VP time `strength` (its marginal there,
+        # alpha * x0 + sigma * noise) instead of from noise alone, and denoise from that time on.
+        if init_image is not None:
+            init_image = self.image_processor.preprocess(init_image, height=height, width=width)
+            init_latents = self._encode_vae_image(init_image.to(device=device, dtype=self.vae.dtype), generator)
+            vp = self.scheduler.vp_interpolant(torch.tensor(strength, device=device))
+            latents = (vp.alpha_t * self._pack_latents(init_latents) + vp.sigma_t * latents).to(latents.dtype)
+
         image_latents = None
         image_latent_ids = None
         if condition_images is not None:
@@ -788,8 +798,8 @@ class Flux2KleinVPSDEPipeline(DiffusionPipeline, Flux2LoraLoaderMixin):
             )
 
         # 6. Prepare timesteps - linearly spaced for stable SDE sampling
-        # Note: we go from 1000 to near 0, but exclude 0 to avoid division by zero in score
-        timesteps = torch.linspace(1000, 0, num_inference_steps + 1, device=device)[:-1]
+        # Note: we go from 1000 (1000 * strength with SDEdit) to near 0, but exclude 0 to avoid division by zero in score
+        timesteps = torch.linspace(1000 * strength, 0, num_inference_steps + 1, device=device)[:-1]
         self.scheduler.timesteps = timesteps.to(dtype=prompt_embeds.dtype)
         self.scheduler._step_index = None
         self.scheduler._begin_index = None

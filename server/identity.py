@@ -34,33 +34,31 @@ class IdentityModel:
         )
         self.app.prepare(ctx_id=0, det_size=(640, 640))
 
-    def embed(self, pil_image: Image.Image) -> dict | None:
+    def embed(self, pil_image: Image.Image) -> list[dict]:
+        """Every face found, best detection first."""
         rgb = pil_image.convert("RGB")
         arr = np.array(rgb)[:, :, ::-1]  # BGR for insightface
-        faces = self.app.get(arr)
-        if not faces:
-            return None
-        best = max(faces, key=lambda f: f.det_score)
-
-        x1, y1, x2, y2 = best.bbox.tolist()
         w, h = rgb.size
-        pad_x = (x2 - x1) * 0.25
-        pad_y = (y2 - y1) * 0.25
-        crop = rgb.crop((
-            max(0, x1 - pad_x),
-            max(0, y1 - pad_y),
-            min(w, x2 + pad_x),
-            min(h, y2 + pad_y),
-        ))
-
-        return {
-            "embedding": best.normed_embedding.astype(np.float32).tolist(),
-            "bbox": [float(v) for v in best.bbox.tolist()],
-            "det_score": float(best.det_score),
-            "kps": best.kps.astype(np.float32).tolist(),
-            "age": int(getattr(best, "age", -1)),
-            "gender": int(getattr(best, "gender", -1)),
-            "crop": crop,
-            "width": w,
-            "height": h,
-        }
+        results = []
+        for face in sorted(self.app.get(arr), key=lambda f: -f.det_score):
+            x1, y1, x2, y2 = face.bbox.tolist()
+            pad_x = (x2 - x1) * 0.25
+            pad_y = (y2 - y1) * 0.25
+            crop = rgb.crop((
+                max(0, x1 - pad_x),
+                max(0, y1 - pad_y),
+                min(w, x2 + pad_x),
+                min(h, y2 + pad_y),
+            ))
+            results.append({
+                "embedding": face.normed_embedding.astype(np.float32).tolist(),
+                "bbox": [float(v) for v in face.bbox.tolist()],
+                "det_score": float(face.det_score),
+                "kps": face.kps.astype(np.float32).tolist(),
+                "age": int(getattr(face, "age", -1)),
+                "gender": int(getattr(face, "gender", -1)),
+                "crop": crop,
+                "width": w,
+                "height": h,
+            })
+        return results

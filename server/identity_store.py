@@ -76,16 +76,20 @@ def _row_exists(table, id_: str) -> bool:
         return False
 
 
-def insert(*, image_bytes: bytes, source_filename: str, model_name: str, embed_result: dict, caption: str = "") -> tuple[str, bool]:
+def insert(*, image_bytes: bytes, source_filename: str, model_name: str, embed_result: dict, caption: str = "", face_index: int = 0) -> tuple[str, bool]:
     """Insert (or repair) one identity row. Returns (id, was_new).
 
     Idempotent: checks each artifact (original, crop, DB row) independently and
     writes only what's missing. This recovers from interrupted previous runs
     where, e.g., the original was written but the crop or row was not.
+
+    One row and one crop per face; the faces of an image share its original. The
+    best face keeps the bare image hash as its id, as rows stored before multi-face had.
     """
-    id_ = hashlib.sha256(image_bytes).hexdigest()
+    sha = hashlib.sha256(image_bytes).hexdigest()
+    id_ = sha if face_index == 0 else f"{sha}_{face_index}"
     ext = Path(source_filename).suffix.lower() or ".jpg"
-    original_p = ORIGINALS / f"{id_}{ext}"
+    original_p = ORIGINALS / f"{sha}{ext}"
     crop_p = CROPS / f"{id_}.jpg"
     table = _table()
 
@@ -139,7 +143,7 @@ def crop_path(id_: str) -> Path | None:
 
 
 def original_path(id_: str) -> Path | None:
-    for f in ORIGINALS.glob(f"{id_}.*"):
+    for f in ORIGINALS.glob(f"{id_[:64]}.*"):
         return f
     return None
 
@@ -166,7 +170,7 @@ def find_similar(id_: str, k: int = 2) -> list[dict]:
 
 
 def delete(id_: str) -> bool:
-    """Remove the DB row + original + crop. Returns True if anything existed."""
+    """Remove the DB row + crop, and the original with its last face. Returns True if anything existed."""
     table = _table()
     existed = _row_exists(table, id_)
     if existed:
@@ -175,7 +179,8 @@ def delete(id_: str) -> bool:
     if crop_p.exists():
         crop_p.unlink()
         existed = True
-    for f in ORIGINALS.glob(f"{id_}.*"):
-        f.unlink()
-        existed = True
+    if not any(CROPS.glob(f"{id_[:64]}*.jpg")):
+        for f in ORIGINALS.glob(f"{id_[:64]}.*"):
+            f.unlink()
+            existed = True
     return existed

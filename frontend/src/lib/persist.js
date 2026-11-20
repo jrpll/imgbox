@@ -30,6 +30,20 @@ export async function saveState(mode, data) {
   });
 }
 
+// Merge a patch into a record in one transaction, so it can't overwrite what another
+// writer (a run finishing, the debounced state save) stored since the record was read.
+export async function updateState(mode, patch) {
+  const db = await open();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    const req = store.get(mode);
+    req.onsuccess = () => store.put({ ...req.result, ...patch }, mode);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function clearState(mode) {
   const db = await open();
   return new Promise((resolve, reject) => {

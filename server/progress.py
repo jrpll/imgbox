@@ -13,14 +13,23 @@ class Snapshot:
     remaining: str = ""
 
 
+class Cancelled(Exception):
+    """Raised inside the running job, at its next progress tick, once it has been cancelled."""
+
+
 class ProgressTracker:
     def __init__(self):
         self._lock = threading.Lock()
         self._snapshot = Snapshot("", 0, 1, "")
         self._listeners: list[tuple[asyncio.Queue, asyncio.AbstractEventLoop]] = []
+        self.cancel = threading.Event()
 
     def set(self, message: str, current: int, total: int, remaining: str = "") -> None:
-        snap = Snapshot(message, current, max(total, 1), remaining)
+        if self.cancel.is_set():
+            raise Cancelled()
+        self._publish(Snapshot(message, current, max(total, 1), remaining))
+
+    def _publish(self, snap: Snapshot) -> None:
         with self._lock:
             self._snapshot = snap
             listeners = list(self._listeners)
@@ -38,7 +47,7 @@ class ProgressTracker:
         self.set(t.desc or "", n, total, remaining)
 
     def clear(self) -> None:
-        self.set("", 0, 1, "")
+        self._publish(Snapshot("", 0, 1, ""))
 
     def snapshot(self) -> Snapshot:
         with self._lock:

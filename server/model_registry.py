@@ -33,6 +33,9 @@ class ModelRegistry:
     def current(self) -> str | None:
         return self._current_name
 
+    def current_model(self) -> Any | None:
+        return self._current_model
+
     def _unload(self) -> None:
         if self._current_model is None:
             return

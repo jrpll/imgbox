@@ -194,8 +194,14 @@ class FINEdits:
         batch_size = 1,
         num_inversion_steps = 50,
         fine_tune = True,
-        lr = 5e-5
+        lr = 5e-5,
+        cfg = 7,
+        mask = None
     ):
+        # The previous image's inversion is void from here on, also if this run is cut short.
+        self.__dict__.pop("zts_ref", None)
+        # Latent-sized, 1 where edit() may change the image; None for everywhere.
+        self.mask = mask
         prompt_embeds,pooled_prompt_embeds = self._prepare_prompt_embeds(
             prompt
         )
@@ -253,15 +259,19 @@ class FINEdits:
         self.inversion_sigmas = self.sigmas.flip(0)
         latent = self.z0.clone()
 
+        do_cfg = cfg > 1
         for i,t in enumerate(ptqdm(self.inversion_timesteps, "Inverting")):
-            model_input = latent
+            model_input = torch.cat([latent]*2) if do_cfg else latent
             timestep = t.expand(model_input.shape[0])
             vf_pred = self.pipe.transformer(
                 hidden_states = model_input,
                 timestep = timestep,
-                encoder_hidden_states = prompt_embeds[1],
-                pooled_projections = pooled_prompt_embeds[1]
+                encoder_hidden_states = prompt_embeds if do_cfg else prompt_embeds[1],
+                pooled_projections = pooled_prompt_embeds if do_cfg else pooled_prompt_embeds[1]
             )[0]
+            if do_cfg:
+                vf_pred_neg, vf_pred_prior = vf_pred.chunk(2)
+                vf_pred = vf_pred_neg + cfg*(vf_pred_prior-vf_pred_neg)
             latent += (self.inversion_sigmas[i+1]-self.inversion_sigmas[i])*vf_pred
             zts.append(latent.detach().clone())
 
@@ -346,17 +356,20 @@ class FINEdits:
         new_zts_ref = [zT]
         latent = zT.clone()
         for i,t in enumerate(ptqdm(timesteps, "Editing")):
-            model_input = torch.cat([latent]*2)
+            model_input = torch.cat([latent]*2) if do_cfg else latent
             timestep = t.expand(model_input.shape[0])
             vf_pred = self.pipe.transformer(
                     hidden_states = model_input,
                     timestep = timestep,
-                    encoder_hidden_states = prompt_embeds,
-                    pooled_projections = pooled_prompt_embeds
+                    encoder_hidden_states = prompt_embeds if do_cfg else prompt_embeds[1:],
+                    pooled_projections = pooled_prompt_embeds if do_cfg else pooled_prompt_embeds[1:]
             )[0]
-            vf_pred_neg, vf_pred_prior = vf_pred.chunk(2)
-            vf_pred = vf_pred_neg + 7*(vf_pred_prior-vf_pred_neg)
+            if do_cfg:
+                vf_pred_neg, vf_pred_prior = vf_pred.chunk(2)
+                vf_pred = vf_pred_neg + cfg*(vf_pred_prior-vf_pred_neg)
             latent += (sigmas[i+1]-sigmas[i])*vf_pred
+            if self.mask is not None:
+                latent = latent * self.mask + zts_ref[i+1] * (1 - self.mask)
             if (i < self.num_inversion_steps - pasting_cutoff - num_skipped_steps) and do_masking:
                 latent = latent * mask.to(DEVICE, DTYPE) + zts_ref[i+1] * (1 - mask.to(DEVICE, DTYPE))
             new_zts_ref.append(latent)

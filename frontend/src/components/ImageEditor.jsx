@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { LANGS, LangContext, translate } from '../lib/i18n';
-import { X, Download, Image, CaretDown, SidebarSimple, ArrowLeft, ArrowRight, Trash, Eye, Intersect, Command, KeyReturn } from '@phosphor-icons/react';
+import { X, Download, Image, CaretDown, SidebarSimple, ArrowBendUpRight, Swap, Command, KeyReturn } from '@phosphor-icons/react';
 import boxIconRaw from '../assets/box.svg?raw'
-import { apiPost, apiGet, apiDelete, apiEventSource } from '../lib/api';
-import { loadState, saveState, clearState } from '../lib/persist';
+import { apiPost, apiGet, apiDelete, apiJob, apiResult, apiEventSource } from '../lib/api';
+import { loadState, saveState, updateState, clearState } from '../lib/persist';
+import HistoryStrip from './HistoryStrip';
+import ModelsPanel from './ModelsPanel';
 import editMode from './modes/Edit';
 import removeBackgroundMode from './modes/RemoveBackground';
 import sam3Mode from './modes/Sam3';
 import flux2KleinMode from './modes/Flux2Klein';
 import flux2KleinFastMode from './modes/Flux2KleinFast';
+import sdeditMode from './modes/SDEdit';
 import identityMode from './modes/Identity';
 
 const MODES = {
@@ -17,16 +20,29 @@ const MODES = {
   'sam3': sam3Mode,
   'flux2klein': flux2KleinMode,
   'flux2klein-fast': flux2KleinFastMode,
+  'sdedit': sdeditMode,
   'identity': identityMode,
 };
 
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+const HISTORY_MAX = 12;
+// The stickers beside a mode's name say what the mode is for; one tint per task.
+const TASK_TINT = {
+  edit: 'bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300',
+  generate: 'bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300',
+  cutout: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300',
+  faces: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+};
 
 export default function ImageEditor() {
   const [images, setImages] = useState([]);
   const [result, setResult] = useState(null);
   const [resultMeta, setResultMeta] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Runs in flight, by mode: a run keeps going while another mode is open. The value is the
+  // server job's id, or true while there is none (the upload, a model load). The ref serves
+  // the callbacks that outlive the render they were made in.
+  const [running, setRunning] = useState({});
+  const runningRef = useRef(running);
   const [modelLoaded, setModelLoaded] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressBar, setProgressBar] = useState({ target: 0, duration: 200 });
@@ -37,9 +53,15 @@ export default function ImageEditor() {
     const saved = localStorage.getItem('imgbox:lastMode');
     return saved && MODES[saved] ? saved : 'edit';
   });
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  // Counts, per mode, the runs that have ended: a hydration that read IndexedDB just before
+  // one did must not put that stale read on screen over what the run brought.
+  const endedRef = useRef({});
   const [modeState, setModeState] = useState(MODES[mode].initialState);
   const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [modelsExpanded, setModelsExpanded] = useState(false);
   const [hfExpanded, setHfExpanded] = useState(false);
   const [hfToken, setHfToken] = useState('');
   const [hfSaved, setHfSaved] = useState(false);
@@ -50,13 +72,27 @@ export default function ImageEditor() {
   });
   const [dark, setDark] = useState(() => localStorage.getItem('imgbox:theme') === 'dark');
   const [lightbox, setLightbox] = useState(null);
-  const [databaseOpen, setDatabaseOpen] = useState(() => localStorage.getItem('imgbox:databaseOpen') === 'true');
-  const [databaseRows, setDatabaseRows] = useState(null);
-  const [selectedRowId, setSelectedRowId] = useState(null);
-  const [matchResult, setMatchResult] = useState(null);
-  const [matchIndex, setMatchIndex] = useState(0);
-  const [matchingId, setMatchingId] = useState(null);
-  const [seeRow, setSeeRow] = useState(null);
+  const [error, setError] = useState(null);
+  // This mode's past results, oldest first; `shown` indexes the one on display.
+  const [history, setHistory] = useState([]);
+  const [shown, setShown] = useState(null);
+  const [showSource, setShowSource] = useState(false);
+  const [sourceUrl, setSourceUrl] = useState(null);
+  const isLoading = !!running[mode];
+  // The open mode's job id, once the server has handed one out: what Cancel cancels.
+  const job = typeof running[mode] === 'string' ? running[mode] : null;
+  const jobRef = useRef(null);
+  jobRef.current = job;
+  const setRun = (m, value) => {
+    const next = { ...runningRef.current };
+    if (value) next[m] = value;
+    else delete next[m];
+    runningRef.current = next;
+    setRunning(next);
+  };
+  // Chaining: a result image waiting for the mode it goes to (`sending`), then for that mode to open.
+  const [sending, setSending] = useState(null);
+  const sentRef = useRef(null);
 
   const t = useMemo(() => (key, params) => translate(key, lang, params), [lang]);
   const handleLangChange = (l) => {
@@ -89,8 +125,9 @@ export default function ImageEditor() {
   }, []);
 
   const modeConfig = MODES[mode];
-  // Modes that name a registry `model` load it explicitly: until then the Run button is Load model.
-  const needsLoad = !!modeConfig.model && !modelLoaded;
+  // Every mode names its registry `model` (the header says whether it is loaded). Those with
+  // `loadFirst` load it explicitly — until then the Run button is Load model; the others on their first run.
+  const needsLoad = !!modeConfig.loadFirst && !modelLoaded;
   const canRun = !isLoading && (needsLoad || modeConfig.canSubmit({ images, state: modeState }));
 
   useEffect(() => {
@@ -102,52 +139,13 @@ export default function ImageEditor() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // The "before" of the result card's before/after toggle.
   useEffect(() => {
-    localStorage.setItem('imgbox:databaseOpen', databaseOpen ? 'true' : 'false');
-    if (!databaseOpen) {
-      setSelectedRowId(null);
-      return;
-    }
-    let cancelled = false;
-    setDatabaseRows(null);
-    (async () => {
-      try {
-        const rows = await apiGet('/identity/list');
-        if (!cancelled) setDatabaseRows(rows);
-      } catch (e) {
-        console.error(e);
-        if (!cancelled) setDatabaseRows([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [databaseOpen]);
-
-  const handleDeleteIdentity = async (id) => {
-    setDatabaseRows(prev => prev ? prev.filter(r => r.id !== id) : prev);
-    try {
-      await apiDelete(`/identity/${id}`);
-    } catch (e) {
-      console.error(e);
-      try {
-        const rows = await apiGet('/identity/list');
-        setDatabaseRows(rows);
-      } catch {}
-    }
-  };
-
-  const handleMatchIdentity = async (id) => {
-    setMatchingId(id);
-    try {
-      const matches = await apiGet(`/identity/match/${id}?k=20`);
-      const query = databaseRows?.find(r => r.id === id) || { id };
-      setMatchIndex(0);
-      setMatchResult({ query, matches });
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setMatchingId(null);
-    }
-  };
+    if (!images.length) { setSourceUrl(null); return; }
+    const url = URL.createObjectURL(images[0]);
+    setSourceUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [images]);
 
   useEffect(() => {
     if (!isLoading) {
@@ -172,11 +170,13 @@ export default function ImageEditor() {
       es.onmessage = (ev) => {
         try {
           const data = JSON.parse(ev.data);
-          const p = data.progress ?? 0;
-          const msg = data.message ?? '';
+          // Progress is the running job's. If that isn't ours, ours is waiting in line behind it.
+          const queued = !!data.job && !!jobRef.current && data.job !== jobRef.current;
+          const p = queued ? 0 : (data.progress ?? 0);
+          const msg = queued ? 'Queued' : (data.message ?? '');
           setProgress(p);
           if (msg) setProgressMessage(msg);
-          setRemaining(data.remaining ?? '');
+          setRemaining(queued ? '' : (data.remaining ?? ''));
 
           const now = Date.now();
           const last = lastTickRef.current;
@@ -204,52 +204,70 @@ export default function ImageEditor() {
   const hydratedRef = useRef(false);
   useEffect(() => {
     hydratedRef.current = false;
-    setModeState(MODES[mode].initialState);
-    setImages([]);
-    setResult(null);
-    setResultMeta(null);
     let cancelled = false;
+    // False once a run of this mode has ended since: what it brought is newer than what is read here.
+    const ended = endedRef.current[mode];
+    const fresh = () => endedRef.current[mode] === ended;
     (async () => {
+      const cfg = MODES[mode];
       const saved = await loadState(mode);
+      const savedHistory = (await loadState(`${mode}:history`)) || [];
       if (cancelled) return;
+      // An image sent here from a result (see handleSendTo).
+      const sent = sentRef.current;
+      sentRef.current = null;
+      if (fresh()) {
+        setHistory(savedHistory);
+        setShown(savedHistory.length ? savedHistory.length - 1 : null);
+      }
+      let state = cfg.initialState;
+      let inputs = [];
       if (saved) {
-        const cfg = MODES[mode];
         const merged = { ...cfg.initialState, ...(saved.modeState || {}) };
-        setModeState(cfg.restoreState ? cfg.restoreState(merged) : merged);
+        // restoreState gets /health: some state only holds while the server still has what it
+        // refers to — which it never does for an image that has just been sent in.
+        const health = !cfg.restoreState || sent ? {} : await apiGet('/health').catch(() => ({}));
+        if (cancelled) return;
+        state = cfg.restoreState ? cfg.restoreState(merged, health) : merged;
+        if (fresh()) setModeState(state);
         const restored = saved.images ?? (saved.image ? [saved.image] : []);
         // Re-read into memory: a persisted File can still be a stale pointer to a file on disk.
-        const materialized = await Promise.all(
+        inputs = await Promise.all(
           restored.map(async (f) => new File([await f.arrayBuffer()], f.name ?? 'image', { type: f.type }))
         );
         if (cancelled) return;
-        if (materialized.length) setImages(materialized);
-        if (saved.result) setResult(URL.createObjectURL(saved.result));
-        if (saved.meta) setResultMeta(saved.meta);
+        // The last result belonged to the image a sent one replaces — unless it is only added.
+        if (fresh() && (!sent || cfg.multi)) {
+          if (saved.result) setResult(URL.createObjectURL(saved.result));
+          if (saved.meta) setResultMeta(saved.meta);
+          if (saved.error) setError(saved.error);
+        }
       }
+      if (sent) inputs = cfg.multi ? [...inputs, sent] : [sent];
+      if (inputs.length) setImages(inputs);
       hydratedRef.current = true;
+      // A run that was still going when the page was left — as opposed to one this page is
+      // already waiting on, behind another mode: pick it up where it is.
+      if (saved?.job && !runningRef.current[mode]) execute({ images: inputs, state, jobId: saved.job });
     })();
     return () => { cancelled = true; };
   }, [mode]);
 
-  // The model may still be on the GPU from an earlier visit, or evicted by another mode since.
+  // Whether this mode's model is the one on the GPU. The registry holds a single one, so a
+  // run starting or ending — in any mode — can change the answer.
   useEffect(() => {
-    setModelLoaded(false);
-    const name = MODES[mode].model;
-    if (!name) return;
     let cancelled = false;
     apiGet('/health')
-      .then((h) => { if (!cancelled) setModelLoaded(h.model === name); })
+      .then((h) => { if (!cancelled) setModelLoaded(h.model === MODES[mode].model); })
       .catch((err) => console.error('health:', err));
     return () => { cancelled = true; };
-  }, [mode]);
+  }, [mode, running]);
 
   // Persist parameter tweaks without waiting for a Run; merge so images/result stay intact
   useEffect(() => {
     if (!hydratedRef.current) return;
     const id = setTimeout(() => {
-      loadState(mode)
-        .then((saved) => saveState(mode, { ...saved, modeState }))
-        .catch(err => console.error('saveState:', err));
+      updateState(mode, { modeState }).catch(err => console.error('saveState:', err));
     }, 500);
     return () => clearTimeout(id);
   }, [mode, modeState]);
@@ -258,40 +276,110 @@ export default function ImageEditor() {
     return () => { if (result) URL.revokeObjectURL(result); };
   }, [result]);
 
+  // Everything that belongs to the mode is reset in the same update that changes it — not in
+  // an effect, a render later: a mode's components must never be handed another mode's state,
+  // whose shape they don't know (Sam3 reading `state.points` off FlowID's state threw).
   const handleModeChange = (value) => {
-    setMode(value);
+    if (value !== mode) {
+      setMode(value);
+      setModeState(MODES[value].initialState);
+      setImages([]);
+      setResult(null);
+      setResultMeta(null);
+      setError(null);
+      setHistory([]);
+      setShown(null);
+      setShowSource(false);
+      setModelLoaded(false);
+    }
     localStorage.setItem('imgbox:lastMode', value);
     setMenuOpen(false);
-    setDatabaseOpen(false);
   };
 
-  const handleSubmit = async () => {
-    setResult(null);
-    setResultMeta(null);
-    setIsLoading(true);
+  // A run is a server-side job, so it survives a reload: the mode's submit starts one through
+  // `run` — or, given `jobId`, waits on the one a previous page load started. It also survives
+  // the mode being left: `mode` here is the run's own, and everything it produces is saved
+  // under it before any of it is shown, which only happens if that mode is (still, or again)
+  // the open one. Inputs are passed in rather than closed over, since on a pick-up this runs
+  // from the hydration effect, where the component's state is still the initial one.
+  // The previous result stays up while the run is in flight, and after one that fails.
+  const execute = async ({ images, state, jobId }) => {
+    const open = () => modeRef.current === mode;
+    setError(null);
+    setRun(mode, jobId ?? true);
     try {
-      const { blob, state: newState, meta } = await modeConfig.submit({ images, state: modeState });
-      setModeState(newState ?? modeState);
-      if (blob) setResult(URL.createObjectURL(blob));
-      if (meta) setResultMeta(meta);
-      saveState(mode, { modeState: newState ?? modeState, images, result: blob, meta })
-        .catch(err => console.error('saveState:', err));
+      const run = async (path, body) => {
+        const id = jobId ?? await apiJob(path, body);
+        setRun(mode, id);
+        if (!jobId) await updateState(mode, { modeState: state, images, job: id, error: null });
+        return apiResult(id);
+      };
+      const { blob, state: newState, meta } = await modeConfig.submit({ images, state, run });
+      await saveState(mode, { modeState: newState ?? state, images, result: blob, meta });
+      // Kept under its own key, so the debounced modeState save doesn't rewrite every blob.
+      let next = null;
+      if (blob || meta?.images) {
+        next = [...((await loadState(`${mode}:history`)) || []), { blob, meta }].slice(-HISTORY_MAX);
+        await saveState(`${mode}:history`, next);
+      }
+      endedRef.current[mode] = (endedRef.current[mode] || 0) + 1;
+      if (!open()) return;
+      // Only a state the submit changed (Edit moving on to its step 2): the one it was given
+      // is where the run started, and the inputs may have moved on since (SDEdit's strokes).
+      if (newState && newState !== state) setModeState(newState);
+      setResult(blob ? URL.createObjectURL(blob) : null);
+      setResultMeta(meta ?? null);
+      setShowSource(false);
+      if (next) {
+        setHistory(next);
+        setShown(next.length - 1);
+      }
     } catch (err) {
       console.error('Error:', err);
+      // Not errors: a cancelled job (409), and one picked up after the server lost it to a restart (404).
+      const message = err.status === 409 || (jobId && err.status === 404) ? null : err.message;
+      // Stored too, for a mode that isn't open to show it once it is.
+      await updateState(mode, { job: null, error: message }).catch(e => console.error('saveState:', e));
+      endedRef.current[mode] = (endedRef.current[mode] || 0) + 1;
+      if (open()) setError(message);
     } finally {
-      setIsLoading(false);
+      setRun(mode, null);
+    }
+  };
+
+  const handleSubmit = () => execute({ images, state: modeState });
+
+  // Chaining: the picked mode opens with the image as its input — added to it, for a mode
+  // that takes several. Its hydration (above) collects the image from sentRef.
+  const handleSendTo = (target) => {
+    const file = new File([sending], `sent.${sending.type === 'image/png' ? 'png' : 'jpg'}`, { type: sending.type });
+    setSending(null);
+    if (target !== mode) {
+      sentRef.current = file;
+      handleModeChange(target);
+      return;
+    }
+    const cfg = MODES[target];
+    setImages(cfg.multi ? [...images, file] : [file]);
+    if (cfg.restoreState) setModeState((s) => cfg.restoreState(s, {}));
+    if (!cfg.multi) {
+      setResult(null);
+      setResultMeta(null);
     }
   };
 
   const handleLoad = async () => {
-    setIsLoading(true);
+    const open = () => modeRef.current === mode;
+    setError(null);
+    setRun(mode, true);
     try {
       await apiPost(`/load/${modeConfig.model}`);
-      setModelLoaded(true);
+      if (open()) setModelLoaded(true);
     } catch (err) {
       console.error('Error:', err);
+      if (open()) setError(err.message);
     } finally {
-      setIsLoading(false);
+      setRun(mode, null);
     }
   };
 
@@ -299,6 +387,17 @@ export default function ImageEditor() {
   const handleLiveResult = (blob) => {
     setResult(blob ? URL.createObjectURL(blob) : null);
     setResultMeta(null);
+    setError(null);
+    setShown(null);
+    setShowSource(false);
+  };
+
+  const handlePickHistory = (i) => {
+    const { blob, meta } = history[i];
+    setResult(blob ? URL.createObjectURL(blob) : null);
+    setResultMeta(meta ?? null);
+    setShown(i);
+    setShowSource(false);
   };
 
   const handleReset = async () => {
@@ -306,7 +405,11 @@ export default function ImageEditor() {
     setImages([]);
     setResult(null);
     setResultMeta(null);
+    setError(null);
+    setHistory([]);
+    setShown(null);
     await clearState(mode);
+    await clearState(`${mode}:history`);
   };
 
   const handleRun = needsLoad ? handleLoad : handleSubmit;
@@ -316,6 +419,7 @@ export default function ImageEditor() {
   runRef.current = { canRun, handleRun };
   useEffect(() => {
     const onKey = (e) => {
+      if (e.key === 'Escape') { setLightbox(null); setSending(null); }
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
         if (runRef.current.canRun) runRef.current.handleRun();
@@ -326,6 +430,19 @@ export default function ImageEditor() {
   }, []);
 
   const Inputs = modeConfig.Inputs;
+  const onRun = () => { if (runRef.current.canRun) runRef.current.handleRun(); };
+  const stickers = (cfg) => (
+    <span className="flex items-center gap-1 flex-shrink-0">
+      {cfg.tasks.map((task) => (
+        <span key={task} className={`px-1.5 py-1 rounded text-[11px] leading-none font-normal ${TASK_TINT[task]}`}>
+          {t(`task.${task}`)}
+        </span>
+      ))}
+    </span>
+  );
+  // Before/after only makes sense for one image in, one image out.
+  const canCompare = !!sourceUrl && images.length === 1 && !modeConfig.Result;
+  const viewed = showSource && canCompare ? sourceUrl : result;
 
   return (
     <LangContext.Provider value={langCtx}>
@@ -334,18 +451,21 @@ export default function ImageEditor() {
       {/* Header */}
       <div className="flex items-center gap-2 flex-shrink-0 pl-2 w-full">
         <span className="w-7 h-7 block self-center text-gray-800 dark:text-gray-200" dangerouslySetInnerHTML={{ __html: boxIconRaw.replace(/width="\d+" height="\d+"/, 'width="28" height="28" fill="currentColor"') }} />
-        <div className="relative w-[280px]" ref={menuRef}>
+        <div className="relative w-[400px]" ref={menuRef}>
           <button
             onClick={() => setMenuOpen(o => !o)}
-            className={`flex items-center gap-2 h-7 px-4 text-base font-normal leading-none border border-gray-300 dark:border-zinc-600 transition-colors w-full justify-between ${menuOpen ? 'rounded-t rounded-b-none bg-gray-100 dark:bg-zinc-700' : 'rounded hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
+            className={`flex items-center gap-2 h-7 px-4 text-base font-normal leading-none border border-gray-300 dark:border-zinc-600 transition-colors w-full ${menuOpen ? 'rounded-t rounded-b-none bg-gray-100 dark:bg-zinc-700' : 'rounded hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
             style={{ textBox: 'trim-both cap alphabetic' }}
           >
-            <span className="grid">
+            <span className="grid flex-1">
               {Object.entries(MODES).map(([value, cfg]) => (
                 <span key={value} className={`col-start-1 row-start-1 text-left ${value === mode ? '' : 'invisible'}`}>{t(cfg.label)}</span>
               ))}
             </span>
-            <CaretDown size={14} className={`transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+            {/* A run going on in a mode other than the open one. */}
+            {Object.keys(running).some((m) => m !== mode) && <span className="w-1.5 h-1.5 rounded-full bg-[#0ea0ff] animate-pulse flex-shrink-0" />}
+            {stickers(modeConfig)}
+            <CaretDown size={14} className={`flex-shrink-0 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
           </button>
           {menuOpen && (
             <div className="absolute top-full left-0 w-full bg-white dark:bg-zinc-800 border border-t-0 border-gray-300 dark:border-zinc-600 rounded-b shadow-lg z-50 overflow-hidden">
@@ -353,21 +473,16 @@ export default function ImageEditor() {
                 <button
                   key={value}
                   onClick={() => handleModeChange(value)}
-                  className={`w-full text-left px-4 py-2 text-base font-normal transition-colors ${!databaseOpen && mode === value ? 'bg-gray-100 dark:bg-zinc-700' : 'hover:bg-gray-50 dark:hover:bg-zinc-700'}`}
+                  className={`w-full flex items-center gap-2 text-left px-4 py-2 text-base font-normal transition-colors ${mode === value ? 'bg-gray-100 dark:bg-zinc-700' : 'hover:bg-gray-50 dark:hover:bg-zinc-700'}`}
                 >
-                  {t(cfg.label)}
+                  <span className="flex-1">{t(cfg.label)}</span>
+                  {running[value] && <span className="w-1.5 h-1.5 rounded-full bg-[#0ea0ff] animate-pulse flex-shrink-0" />}
+                  {stickers(cfg)}
                 </button>
               ))}
             </div>
           )}
         </div>
-        <button
-          onClick={() => setDatabaseOpen(o => !o)}
-          className={`flex items-center h-7 px-4 text-base font-normal leading-none border border-gray-300 dark:border-zinc-600 rounded transition-colors ${databaseOpen ? 'bg-gray-100 dark:bg-zinc-800' : 'hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
-          style={{ textBox: 'trim-both cap alphabetic' }}
-        >
-          {t('common.database')}
-        </button>
         {modeConfig.model && (
           <span className={`ml-2 flex items-center gap-1.5 text-sm transition-colors ${modelLoaded ? 'text-[#0ea0ff]' : 'text-gray-400'}`}>
             <span className={`w-2 h-2 rounded-full transition-colors ${modelLoaded ? 'bg-[#0ea0ff]' : 'bg-gray-300 dark:bg-zinc-600'}`} />
@@ -377,6 +492,7 @@ export default function ImageEditor() {
         <div className="ml-auto self-center" ref={settingsRef}>
           <button
             onClick={() => setSettingsOpen(o => !o)}
+            title={t('common.settings')}
             className="p-1.5 rounded-full text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
           >
             <SidebarSimple size={20} mirrored />
@@ -384,7 +500,14 @@ export default function ImageEditor() {
           {settingsOpen && (
             <div className="absolute top-0 right-0 h-full w-96 bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700 shadow-lg flex flex-col z-50">
               <div className="px-5 pt-5 pb-3 border-b border-gray-100 dark:border-zinc-800 font-semibold">{t('common.settings')}</div>
-              <div className="flex flex-col py-2">
+              <div className="flex flex-col py-2 overflow-y-auto">
+                <button
+                  onClick={() => setModelsExpanded(o => !o)}
+                  className="text-left px-5 py-3 text-sm hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  {t('common.models')}
+                </button>
+                {modelsExpanded && <ModelsPanel modes={MODES} />}
                 <button
                   onClick={() => { setHfExpanded(o => !o); setHfSaved(false); }}
                   className="text-left px-5 py-3 text-sm hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
@@ -445,119 +568,31 @@ export default function ImageEditor() {
         </div>
       </div>
 
-      {/* Main row — two cards, or single database card */}
+      {/* Main row — two cards */}
       <div className="flex gap-3 flex-1 min-h-0">
-
-      {databaseOpen ? (
-        <div className="flex-1 flex flex-col rounded border border-gray-200 dark:border-zinc-700 overflow-hidden">
-          <div className="px-5 py-3 border-b border-gray-100 dark:border-zinc-800 flex items-center gap-4 text-xs font-medium text-gray-400 uppercase tracking-wide">
-            <div className="w-16 flex-shrink-0">{t('common.picture')}</div>
-            <div className="w-48 min-w-0">{t('common.filename')}</div>
-            <div className="w-24">{t('common.date')}</div>
-            <div className="w-16">{t('common.gender')}</div>
-            <div className="flex-1 min-w-0">{t('common.caption')}</div>
-            <div className="w-6" />
-          </div>
-          <div className="flex-1 overflow-y-auto bg-white dark:bg-zinc-900">
-            {databaseRows === null ? (
-              <div className="h-full" />
-            ) : databaseRows.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                {t('common.empty_database')}
-              </div>
-            ) : (
-              <div>
-                {databaseRows.map(row => {
-                  const url = `/identity/crop/${row.id}`;
-                  const gender = row.gender === 0 ? 'F' : row.gender === 1 ? 'M' : '—';
-                  const date = row.created_at ? row.created_at.slice(0, 10) : '—';
-                  const filename = (row.source_filename || '').split(/[\\/]/).pop();
-                  const selected = selectedRowId === row.id;
-                  return (
-                    <div
-                      key={row.id}
-                      onClick={() => setSelectedRowId(selected ? null : row.id)}
-                      className={`relative px-5 py-2 border-b border-gray-100 dark:border-zinc-800 cursor-pointer ${selected ? 'bg-gray-100 dark:bg-zinc-800' : 'hover:bg-gray-50 dark:hover:bg-zinc-800/60'}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 flex-shrink-0">
-                          <img
-                            src={url}
-                            onClick={(e) => { e.stopPropagation(); setLightbox(url); }}
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            className="w-10 h-10 object-cover rounded cursor-zoom-in bg-gray-100"
-                          />
-                        </div>
-                        <div className="w-48 min-w-0 text-sm text-gray-700 dark:text-gray-200 truncate" title={filename}>{filename}</div>
-                        <div className="text-xs text-gray-400 w-24">{date}</div>
-                        <div className="text-xs text-gray-400 w-16">{gender}</div>
-                        <div className="flex-1 min-w-0 text-xs text-gray-400 truncate" title={row.caption || ''}>{row.caption || '—'}</div>
-                      </div>
-                      {selected && (
-                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setSeeRow(row); }}
-                            className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 text-xs bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-300 rounded shadow-sm hover:bg-gray-800 hover:text-white hover:border-gray-800 dark:hover:bg-gray-100 dark:hover:text-zinc-900 dark:hover:border-gray-100 transition-colors"
-                          >
-                            <Eye size={14} />
-                            {t('common.view')}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={matchingId === row.id}
-                            onClick={(e) => { e.stopPropagation(); handleMatchIdentity(row.id); }}
-                            className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 text-xs bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-600 text-gray-600 dark:text-gray-300 rounded shadow-sm hover:bg-gray-800 hover:text-white hover:border-gray-800 dark:hover:bg-gray-100 dark:hover:text-zinc-900 dark:hover:border-gray-100 transition-colors disabled:cursor-wait"
-                          >
-                            <Intersect size={14} />
-                            {t('common.match')}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleDeleteIdentity(row.id); }}
-                            className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1 text-xs bg-white dark:bg-zinc-800 border border-red-300 dark:border-red-500/50 text-red-500 dark:text-red-400 rounded shadow-sm hover:bg-red-500 hover:text-white hover:border-red-500 dark:hover:bg-red-500 dark:hover:text-white transition-colors"
-                          >
-                            <Trash size={14} />
-                            {t('common.delete')}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (<>
 
         {/* Input card */}
         <div className="w-[380px] flex-shrink-0 flex flex-col rounded border border-gray-200 dark:border-zinc-700 overflow-hidden">
           <div className="px-5 pt-4 pb-3 border-b border-gray-100 dark:border-zinc-800 flex items-center justify-between">
-            <span className="font-semibold">
-              {t('common.input')}
-              {modeConfig.getStepLabel && (
-                <span className="text-gray-400 font-normal"> · {modeConfig.getStepLabel(modeState, t)}</span>
-              )}
-            </span>
-            {modeConfig.totalSteps && (
-              <div className="flex items-center gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => setModeState((s) => ({ ...s, step: s.step - 1 }))}
-                  disabled={modeState.step === 1}
-                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                >
-                  <ArrowLeft size={15} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModeState((s) => ({ ...s, step: s.step + 1 }))}
-                  disabled={modeState.step === modeConfig.totalSteps}
-                  className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                >
-                  <ArrowRight size={15} />
-                </button>
+            <span className="font-semibold">{t('common.input')}</span>
+            {modeConfig.steps && (
+              <div className="flex items-center gap-1">
+                {modeConfig.steps.map((step, i) => (
+                  <button
+                    key={step.label}
+                    type="button"
+                    onClick={() => setModeState((s) => ({ ...s, step: i + 1 }))}
+                    disabled={!!step.enabled && !step.enabled(modeState)}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 text-xs rounded transition-colors disabled:opacity-40 ${
+                      modeState.step === i + 1
+                        ? 'bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-gray-200'
+                        : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    <span className="tabular-nums">{i + 1}</span>
+                    {t(step.label)}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -571,18 +606,22 @@ export default function ImageEditor() {
               setImages={setImages}
               onZoom={setLightbox}
               onResult={handleLiveResult}
+              onError={setError}
+              onRun={onRun}
               loaded={modelLoaded}
             />
           </div>
 
           {/* Shared action buttons */}
           <div className="flex items-center gap-3 px-5 py-4 border-t border-gray-100 dark:border-zinc-800">
+            {/* Reset, or Cancel while a job runs; neither during the upload or a model load. */}
             <button
               type="button"
-              onClick={handleReset}
-              className={`px-4 h-9 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-[transform,background-color] active:scale-[0.96]`}
+              onClick={job ? () => apiDelete(`/jobs/${job}`).catch(err => console.error('cancel:', err)) : handleReset}
+              disabled={isLoading && !job}
+              className={`px-4 h-9 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-[transform,background-color] active:scale-[0.96] disabled:opacity-40`}
             >
-              {t('common.reset')}
+              {t(job ? 'common.cancel' : 'common.reset')}
             </button>
             <button
               type="button"
@@ -623,155 +662,104 @@ export default function ImageEditor() {
           <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-gray-100 dark:border-zinc-800">
             <span className="font-semibold">{t('common.result')}</span>
             {result && (
-              <button
-                type="button"
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = result;
-                  link.download = 'generated-image.png';
-                  link.click();
-                }}
-                className="flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-[transform,background-color] active:scale-[0.96]"
-              >
-                <Download size={13} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => setSending(await fetch(result).then((r) => r.blob()))}
+                  title={t('common.send_to')}
+                  className="flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-[transform,background-color] active:scale-[0.96]"
+                >
+                  <ArrowBendUpRight size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const { type } = await fetch(result).then((r) => r.blob());
+                    const link = document.createElement('a');
+                    link.href = result;
+                    link.download = `generated-image.${type === 'image/png' ? 'png' : 'jpg'}`;
+                    link.click();
+                  }}
+                  title={t('common.download')}
+                  className="flex items-center px-2 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-[transform,background-color] active:scale-[0.96]"
+                >
+                  <Download size={13} />
+                </button>
+              </div>
             )}
           </div>
 
+          {error && (
+            <div className="px-5 py-2 max-h-24 overflow-y-auto border-b border-gray-100 dark:border-zinc-800 text-sm text-red-500 dark:text-red-400 whitespace-pre-wrap break-words">
+              {error}
+            </div>
+          )}
+
           <div className="flex-1 flex items-center justify-center p-4 bg-gray-50 dark:bg-zinc-800/50 overflow-hidden">
             {modeConfig.Result ? (
-              <modeConfig.Result result={result} meta={resultMeta} onZoom={setLightbox} />
+              <modeConfig.Result
+                result={result}
+                meta={resultMeta}
+                onZoom={setLightbox}
+                onSend={setSending}
+                state={modeState}
+                setState={setModeState}
+                images={images}
+                loaded={modelLoaded}
+                onResult={handleLiveResult}
+              />
             ) : result ? (
-              <img src={result} alt="Generated" onClick={() => setLightbox(result)} className="max-w-full max-h-full object-contain rounded cursor-zoom-in" />
+              <img src={viewed} alt="Generated" onClick={() => setLightbox(viewed)} className="max-w-full max-h-full object-contain rounded cursor-zoom-in" />
             ) : (
               <div className="flex flex-col items-center gap-2 text-gray-300 dark:text-zinc-600">
                 <Image size={40} />
               </div>
             )}
           </div>
+
+          {/* Under the image, next to it rather than across the screen: before/after, and
+              whatever the mode tunes its result with. Gone when neither applies. */}
+          <div className="flex items-center justify-center gap-6 px-5 py-3 border-t border-gray-100 dark:border-zinc-800 empty:hidden">
+            {canCompare && result && (
+              <button
+                type="button"
+                onClick={() => setShowSource(s => !s)}
+                className={`flex items-center gap-1.5 px-2 py-1 text-xs border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 transition-[transform,background-color] active:scale-[0.96] ${showSource ? 'bg-gray-100 dark:bg-zinc-800' : 'hover:bg-gray-50 dark:hover:bg-zinc-800'}`}
+              >
+                <Swap size={13} />
+                {t('common.compare')}
+              </button>
+            )}
+            {modeConfig.ResultControls && <modeConfig.ResultControls state={modeState} setState={setModeState} onRun={onRun} />}
+          </div>
+
+          {history.length > 1 && <HistoryStrip entries={history} shown={shown} onPick={handlePickHistory} />}
         </div>
-      </>)}
       </div>
 
       {/* Settings panel */}
 
-      {/* see detail overlay */}
-      {seeRow && (() => {
-        const filename = (seeRow.source_filename || '').split(/[\\/]/).pop() || '—';
-        const date = seeRow.created_at ? seeRow.created_at.slice(0, 10) : '—';
-        const gender = seeRow.gender === 0 ? 'F' : seeRow.gender === 1 ? 'M' : '—';
-        return (
-          <div
-            onClick={() => setSeeRow(null)}
-            className="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-8 cursor-pointer"
-          >
-            <div onClick={(e) => e.stopPropagation()} className="relative bg-white dark:bg-zinc-900 rounded-lg p-6 max-w-2xl w-full cursor-default">
+      {/* send-to picker */}
+      {sending && (
+        <div
+          onClick={() => setSending(null)}
+          className="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-8 cursor-pointer"
+        >
+          <div onClick={(e) => e.stopPropagation()} className="bg-white dark:bg-zinc-900 rounded-lg py-2 w-72 cursor-default overflow-hidden">
+            <div className="px-4 py-2 text-xs text-gray-400 uppercase tracking-wide">{t('common.send_to')}</div>
+            {Object.entries(MODES).map(([value, cfg]) => (
               <button
-                type="button"
-                onClick={() => setSeeRow(null)}
-                className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600"
+                key={value}
+                onClick={() => handleSendTo(value)}
+                className="w-full flex items-center gap-2 text-left px-4 py-2 text-base font-normal transition-colors hover:bg-gray-50 dark:hover:bg-zinc-700"
               >
-                <X size={18} />
+                <span className="flex-1">{t(cfg.label)}</span>
+                {stickers(cfg)}
               </button>
-              <div className="flex gap-6">
-                <img
-                  src={`/identity/crop/${seeRow.id}`}
-                  onClick={() => setLightbox(`/identity/crop/${seeRow.id}`)}
-                  className="w-64 h-64 object-cover rounded cursor-zoom-in bg-gray-100 flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0 flex flex-col gap-3 pt-1">
-                  <div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.filename')}</div>
-                    <div className="text-sm text-gray-700 dark:text-gray-200 break-all">{filename}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.date')}</div>
-                    <div className="text-sm text-gray-700 dark:text-gray-200">{date}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.gender')}</div>
-                    <div className="text-sm text-gray-700 dark:text-gray-200">{gender}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-400 uppercase tracking-wide">{t('common.caption')}</div>
-                    <div className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words">{seeRow.caption || '—'}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
-        );
-      })()}
-
-      {/* match results overlay */}
-      {matchResult && (() => {
-        const total = matchResult.matches.length;
-        const m = total > 0 ? matchResult.matches[matchIndex] : null;
-        const fmtName = (r) => (r?.source_filename || '').split(/[\\/]/).pop() || '—';
-        const fmtDate = (r) => r?.created_at ? r.created_at.slice(0, 10) : '—';
-        const fmtGender = (r) => r?.gender === 0 ? 'F' : r?.gender === 1 ? 'M' : '—';
-        return (
-          <div
-            onClick={() => setMatchResult(null)}
-            className="fixed inset-0 z-[90] bg-black/70 flex items-center justify-center p-8 cursor-pointer"
-          >
-            <div onClick={(e) => e.stopPropagation()} className="relative bg-white dark:bg-zinc-900 rounded-lg p-6 max-w-3xl w-full cursor-default flex flex-col items-center gap-4">
-              <button
-                type="button"
-                onClick={() => setMatchResult(null)}
-                className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600"
-              >
-                <X size={18} />
-              </button>
-              <div className="flex gap-6 justify-center items-start">
-                <div className="flex flex-col items-center gap-1">
-                  <img
-                    src={`/identity/crop/${matchResult.query.id}`}
-                    onClick={() => setLightbox(`/identity/crop/${matchResult.query.id}`)}
-                    className="w-40 h-40 object-cover rounded cursor-zoom-in bg-gray-100"
-                  />
-                  <span className="text-xs text-gray-500 max-w-[160px] truncate" title={fmtName(matchResult.query)}>{fmtName(matchResult.query)}</span>
-                  <span className="text-[11px] text-gray-400">{fmtDate(matchResult.query)} · {fmtGender(matchResult.query)}</span>
-                </div>
-                {m ? (
-                  <div className="flex flex-col items-center gap-1">
-                    <img
-                      src={`/identity/crop/${m.id}`}
-                      onClick={() => setLightbox(`/identity/crop/${m.id}`)}
-                      className="w-40 h-40 object-cover rounded cursor-zoom-in bg-gray-100"
-                    />
-                    <span className="text-xs text-gray-500 max-w-[160px] truncate" title={fmtName(m)}>{fmtName(m)}</span>
-                    <span className="text-[11px] text-gray-400">{fmtDate(m)} · {fmtGender(m)}</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center text-gray-400 text-sm">{t('common.empty_database')}</div>
-                )}
-              </div>
-              {m && (
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setMatchIndex(i => Math.max(0, i - 1))}
-                    disabled={matchIndex === 0}
-                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                  >
-                    <ArrowLeft size={15} />
-                  </button>
-                  <span className="text-xs text-gray-400 tabular-nums w-12 text-center">{matchIndex + 1} / {total}</span>
-                  <button
-                    type="button"
-                    onClick={() => setMatchIndex(i => Math.min(total - 1, i + 1))}
-                    disabled={matchIndex === total - 1}
-                    className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
-                  >
-                    <ArrowRight size={15} />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* lightbox */}
       {lightbox && (

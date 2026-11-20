@@ -61,6 +61,14 @@ export default function ImageDropZone({ images, onChange, multi = false, directo
     onChange(prev => multi ? [...prev, ...fresh] : fresh.slice(0, 1));
   };
 
+  // Pasting an image anywhere on the page drops it in. Re-bound every render, so the
+  // listener always adds through the current onChange.
+  useEffect(() => {
+    const onPaste = (e) => { if (e.clipboardData?.files.length) addFiles(e.clipboardData.files); };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  });
+
   const handleDrop = async (e) => {
     e.preventDefault();
     setIsDragging(false);

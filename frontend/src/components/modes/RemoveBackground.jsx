@@ -1,4 +1,3 @@
-import { apiPost } from '../../lib/api';
 import ImageDropZone from '../ImageDropZone';
 
 function Inputs({ images, setImages, onZoom }) {
@@ -9,15 +8,17 @@ function Inputs({ images, setImages, onZoom }) {
   );
 }
 
-async function submit({ images, state }) {
+async function submit({ images, state, run }) {
   const fd = new FormData();
   fd.append('image', images[0]);
-  const r = await apiPost('/remove-background', fd);
+  const r = await run('/remove-background', fd);
   return { blob: await r.blob(), state };
 }
 
 export default {
   label: 'mode.remove-background',
+  tasks: ['cutout'],
+  model: 'remove-background',
   initialState: {},
   Inputs,
   submit,

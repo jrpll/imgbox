@@ -26,33 +26,49 @@ async function getBaseUrl() {
   return _baseUrl;
 }
 
+// The server's errors carry a JSON `detail`; anything else is reported as status + body.
+async function fail(response) {
+  const text = await response.text().catch(() => response.statusText);
+  let detail;
+  try { detail = JSON.parse(text).detail; } catch { /* not JSON */ }
+  const error = new Error(typeof detail === 'string' ? detail : `${response.status}: ${text}`);
+  error.status = response.status;
+  throw error;
+}
+
 export async function apiPost(path, body) {
   const base = await getBaseUrl();
   const response = await fetch(`${base}${path}`, { method: 'POST', body });
-  if (!response.ok) {
-    const text = await response.text().catch(() => response.statusText);
-    throw new Error(`${response.status}: ${text}`);
-  }
+  if (!response.ok) await fail(response);
   return response;
 }
 
 export async function apiGet(path) {
   const base = await getBaseUrl();
   const response = await fetch(`${base}${path}`);
-  if (!response.ok) {
-    const text = await response.text().catch(() => response.statusText);
-    throw new Error(`${response.status}: ${text}`);
-  }
+  if (!response.ok) await fail(response);
   return response.json();
 }
 
 export async function apiDelete(path) {
   const base = await getBaseUrl();
   const response = await fetch(`${base}${path}`, { method: 'DELETE' });
-  if (!response.ok) {
-    const text = await response.text().catch(() => response.statusText);
-    throw new Error(`${response.status}: ${text}`);
-  }
+  if (!response.ok) await fail(response);
+  return response;
+}
+
+// Start a route's work as a server-side job (`?job=1`); resolves to the job's id.
+export async function apiJob(path, body) {
+  const response = await apiPost(`${path}?job=1`, body);
+  return (await response.json()).job_id;
+}
+
+// Waits for a job, then resolves to the response its route would have given.
+// Rejects with status 409 if it was cancelled, 404 if the server no longer knows it.
+export async function apiResult(jobId) {
+  const base = await getBaseUrl();
+  const response = await fetch(`${base}/jobs/${jobId}/result`);
+  if (!response.ok) await fail(response);
   return response;
 }
 

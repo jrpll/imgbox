@@ -1,15 +1,94 @@
 import { useState, useEffect } from 'react';
-import { X, ArrowUUpLeft, Trash, Eraser } from '@phosphor-icons/react';
+import { X, ArrowUUpLeft, Trash, Eraser, Eye, Image as ImageIcon } from '@phosphor-icons/react';
 import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
 import ImageDropZone from '../ImageDropZone';
 
 const initialState = { points: [], labels: [], preserve: false, additive: false, erase: [], text: '' };
 
-function Inputs({ state, setState, images, setImages, onZoom, onResult, loaded }) {
+function Inputs({ state, setState, images, setImages, onZoom, onResult, onError }) {
+  const { t } = useLang();
+
+  // Clicking needs no Run step: every point re-cuts the image and pushes the result up.
+  // The server keeps the image embedding cached, so only the mask decoder runs again.
+  useEffect(() => {
+    if (!images.length || !state.points.length) return;
+    let cancelled = false;
+    const fd = new FormData();
+    fd.append('image', images[0]);
+    fd.append('points', JSON.stringify(state.points));
+    fd.append('labels', JSON.stringify(state.labels));
+    fd.append('preserve', state.preserve);
+    fd.append('additive', state.additive);
+    fd.append('erase', JSON.stringify(state.erase));
+    apiPost('/sam3', fd)
+      .then((r) => r.blob())
+      .then((blob) => { if (!cancelled) onResult(blob); })
+      .catch((err) => {
+        console.error('sam3:', err);
+        if (!cancelled) onError(err.message);
+      });
+    return () => { cancelled = true; };
+  }, [images, state.points, state.labels, state.preserve, state.additive, state.erase]);
+
+  const set = (patch) => setState((s) => ({ ...s, ...patch }));
+
+  return (
+    <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+      {/* Another image voids the points placed on this one, and the cutout made from it. */}
+      <ImageDropZone
+        images={images}
+        onChange={(next) => { setImages(next); onResult(null); set({ points: [], labels: [], erase: [] }); }}
+        onZoom={onZoom}
+      />
+
+      <div className="group flex flex-col gap-1.5">
+        <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('sam3.preserve')}</span>
+        <button type="button" onClick={() => set({ preserve: !state.preserve })} className="self-start">
+          <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${state.preserve ? 'bg-[#0ea0ff]' : 'bg-gray-300 dark:bg-zinc-600'}`}>
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${state.preserve ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          </span>
+        </button>
+      </div>
+
+      {/* Additive: every point is its own object, added (or, right-click, removed) on its own. */}
+      <div className="group flex flex-col gap-1.5">
+        <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('sam3.additive')}</span>
+        <button type="button" onClick={() => set({ additive: !state.additive })} className="self-start">
+          <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${state.additive ? 'bg-[#0ea0ff]' : 'bg-gray-300 dark:bg-zinc-600'}`}>
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${state.additive ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          </span>
+        </button>
+      </div>
+
+      {/* Text is the other SAM3 head: one shot behind Run, and only while no point is set. */}
+      <div className="group flex flex-col gap-1">
+        <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('sam3.prompt')}</span>
+        <div className="relative">
+          <textarea
+            value={state.text}
+            disabled={state.points.length > 0}
+            onChange={(e) => set({ text: e.target.value })}
+            rows={2}
+            placeholder={t('sam3.prompt_example')}
+            className="input-textarea"
+          />
+          {state.text && !state.points.length && (
+            <button type="button" onClick={() => set({ text: '' })} className="input-clear-btn">
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The result card is the workspace: the image at full size, clicked to select (right-click
+// to exclude), with the cutout the shell holds as `result` laid over it as the selection.
+function Result({ result, state, setState, images, loaded, onResult, onZoom }) {
   const { t } = useLang();
   const [imageUrl, setImageUrl] = useState(null);
-  const [cutout, setCutout] = useState(null);
   const [view, setView] = useState(null);
   const [zoom, setZoom] = useState({ s: 1, x: 0, y: 0 });
   const [dims, setDims] = useState(null);
@@ -17,9 +96,11 @@ function Inputs({ state, setState, images, setImages, onZoom, onResult, loaded }
   const [brush, setBrush] = useState(8);
   const [stroke, setStroke] = useState(null);
   const [hover, setHover] = useState(null);
+  const [plain, setPlain] = useState(false);
 
   useEffect(() => {
     setZoom({ s: 1, x: 0, y: 0 });
+    setDims(null);
     if (!images.length) { setImageUrl(null); return; }
     const url = URL.createObjectURL(images[0]);
     setImageUrl(url);
@@ -116,31 +197,6 @@ function Inputs({ state, setState, images, setImages, onZoom, onResult, loaded }
     };
   }, [view, erasing, brush]);
 
-  // Clicking needs no Run step: every point re-cuts the image and pushes the result up.
-  // The server keeps the image embedding cached, so only the mask decoder runs again.
-  useEffect(() => {
-    if (!images.length || !state.points.length) { setCutout(null); return; }
-    let cancelled = false;
-    let url = null;
-    const fd = new FormData();
-    fd.append('image', images[0]);
-    fd.append('points', JSON.stringify(state.points));
-    fd.append('labels', JSON.stringify(state.labels));
-    fd.append('preserve', state.preserve);
-    fd.append('additive', state.additive);
-    fd.append('erase', JSON.stringify(state.erase));
-    apiPost('/sam3', fd)
-      .then((r) => r.blob())
-      .then((blob) => {
-        if (cancelled) return;
-        url = URL.createObjectURL(blob);
-        setCutout(url);
-        onResult(blob);
-      })
-      .catch((err) => console.error('sam3:', err));
-    return () => { cancelled = true; if (url) URL.revokeObjectURL(url); };
-  }, [images, state.points, state.labels, state.preserve, state.additive, state.erase]);
-
   // Normalized coords so the points survive a resize and the persisted state stays
   // independent of the image resolution.
   const addPoint = (e, label) => {
@@ -163,176 +219,150 @@ function Inputs({ state, setState, images, setImages, onZoom, onResult, loaded }
   });
   const clear = () => { onResult(null); setState((s) => ({ ...s, points: [], labels: [], erase: [] })); };
 
-  const set = (patch) => setState((s) => ({ ...s, ...patch }));
-  const btn = 'flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 transition-[transform,background-color] active:scale-[0.96]';
+  if (!imageUrl) {
+    return (
+      <div className="flex flex-col items-center gap-2 text-gray-300 dark:text-zinc-600">
+        <ImageIcon size={40} />
+      </div>
+    );
+  }
+
+  const btn = 'inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs border border-gray-300 dark:border-zinc-600 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-800 disabled:opacity-40 transition-[transform,background-color] active:scale-[0.96]';
 
   return (
-    <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
-      {!imageUrl ? (
-        <ImageDropZone images={images} onChange={setImages} onZoom={onZoom} />
-      ) : (
-        <>
-          {/* The cutout stacked over a blue wash: it is opaque wherever it was kept, so
-              the wash only shows through the part that gets removed. */}
-          <div className="flex flex-col gap-2">
-            <div ref={setView} className={`relative rounded overflow-hidden select-none ${loaded ? 'cursor-crosshair' : ''}`}>
-              {/* Clicks land on the zoomed layer, whose transformed box still maps to [0, 1]. */}
-              <div
-                onClick={(e) => addPoint(e, 1)}
-                onContextMenu={(e) => addPoint(e, 0)}
-                style={{ transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})`, transformOrigin: '0 0' }}
-                className="relative"
-              >
-                <img
-                  src={imageUrl}
-                  alt="Error loading image"
-                  draggable={false}
-                  onLoad={(e) => setDims([e.currentTarget.naturalWidth, e.currentTarget.naturalHeight])}
-                  className="block w-full"
-                />
-                {cutout && dims && (
-                  <>
-                    <span className="absolute inset-0 bg-[#0ea0ff] opacity-50 pointer-events-none" />
-                    {/* Strokes are masked out of the cutout here as you paint; the server bakes
-                        them into the result, so this is a no-op once its response lands. */}
-                    <svg viewBox={`0 0 ${dims[0]} ${dims[1]}`} className="absolute inset-0 w-full h-full pointer-events-none">
-                      <mask id="sam3-erase">
-                        <rect width={dims[0]} height={dims[1]} fill="white" />
-                        {[...state.erase, ...(stroke ? [stroke] : [])].map((st, i) => (
-                          <polyline
-                            key={i}
-                            points={st.pts.map(([x, y]) => `${x * dims[0]},${y * dims[1]}`).join(' ')}
-                            fill="none"
-                            stroke="black"
-                            strokeWidth={2 * st.r * dims[0]}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        ))}
-                      </mask>
-                      <image href={cutout} width={dims[0]} height={dims[1]} mask="url(#sam3-erase)" />
-                    </svg>
-                  </>
-                )}
-                {/* Counter-scaled so dots stay the same size on screen at any zoom. */}
-                {state.points.map(([x, y], i) => (
-                  <span
-                    key={i}
-                    style={{ left: `${x * 100}%`, top: `${y * 100}%`, transform: `translate(-50%, -50%) scale(${1 / zoom.s})` }}
-                    className={`absolute w-2.5 h-2.5 rounded-full border-2 border-white pointer-events-none ${
-                      state.labels[i] ? 'bg-[#0ea0ff]' : 'bg-red-500'
-                    }`}
-                  />
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setImages([]); clear(); }}
-                className="absolute top-1 right-1 p-0.5 bg-gray-400 text-white rounded-full hover:bg-gray-500"
-              >
-                <X size={12} />
-              </button>
-              {erasing && hover && (
-                <span
-                  style={{ left: hover[0], top: hover[1], width: 2 * brush, height: 2 * brush }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-white shadow-[0_0_0_1px_rgba(0,0,0,0.4)] pointer-events-none"
-                />
+    <div className="w-full h-full min-h-0 flex flex-col gap-3">
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <button type="button" onClick={() => setErasing(!erasing)} className={`${btn} ${erasing ? 'bg-gray-100 dark:bg-zinc-800' : ''}`}>
+          <Eraser size={13} />
+          {t('sam3.eraser')}
+        </button>
+        <button type="button" onClick={undo} disabled={!(erasing ? state.erase : state.points).length} className={btn}>
+          <ArrowUUpLeft size={13} />
+          {t('sam3.undo')}
+        </button>
+        <button type="button" onClick={clear} disabled={!state.points.length && !state.erase.length} className={btn}>
+          <Trash size={13} />
+          {t('sam3.clear')}
+        </button>
+        {/* The bare cutout, without the image and the wash it is laid over. */}
+        <button type="button" onClick={() => setPlain(!plain)} disabled={!result} className={`${btn} ${plain && result ? 'bg-gray-100 dark:bg-zinc-800' : ''}`}>
+          <Eye size={13} />
+          {t('common.result')}
+        </button>
+        {erasing && (
+          <div className="group flex items-center gap-3 ml-2">
+            <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('sam3.brush')}</span>
+            <input
+              type="range"
+              min="1"
+              max="40"
+              step="1"
+              value={brush}
+              onChange={(e) => setBrush(parseInt(e.target.value))}
+              className="w-40 accent-[#0ea0ff]"
+            />
+            <span className="w-9 text-xs tabular-nums text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{2 * brush}px</span>
+          </div>
+        )}
+      </div>
+
+      {/* A size container, so the frame below can be sized to the image fitted inside it. */}
+      <div className="flex-1 min-h-0 flex items-center justify-center" style={{ containerType: 'size' }}>
+        {plain && result ? (
+          <img src={result} alt="Generated" onClick={() => onZoom(result)} className="max-w-full max-h-full object-contain rounded cursor-zoom-in" />
+        ) : (
+          // The frame hugs the image exactly — clicks are read against its box. Until the
+          // image has loaded and told its ratio, it is laid out unseen.
+          <div
+            ref={setView}
+            style={dims ? { width: `min(100cqw, calc(100cqh * ${dims[0] / dims[1]}))` } : { width: '100%', visibility: 'hidden' }}
+            className={`relative rounded overflow-hidden select-none ${loaded ? 'cursor-crosshair' : ''}`}
+          >
+            {/* Clicks land on the zoomed layer, whose transformed box still maps to [0, 1]. */}
+            <div
+              onClick={(e) => addPoint(e, 1)}
+              onContextMenu={(e) => addPoint(e, 0)}
+              style={{ transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.s})`, transformOrigin: '0 0' }}
+              className="relative"
+            >
+              <img
+                src={imageUrl}
+                alt="Error loading image"
+                draggable={false}
+                onLoad={(e) => setDims([e.currentTarget.naturalWidth, e.currentTarget.naturalHeight])}
+                className="block w-full"
+              />
+              {/* The cutout stacked over a blue wash: it is opaque wherever it was kept, so
+                  the wash only shows through the part that gets removed. */}
+              {result && dims && (
+                <>
+                  <span className="absolute inset-0 bg-[#0ea0ff] opacity-50 pointer-events-none" />
+                  {/* Strokes are masked out of the cutout here as you paint; the server bakes
+                      them into the result, so this is a no-op once its response lands. */}
+                  <svg viewBox={`0 0 ${dims[0]} ${dims[1]}`} className="absolute inset-0 w-full h-full pointer-events-none">
+                    <mask id="sam3-erase">
+                      <rect width={dims[0]} height={dims[1]} fill="white" />
+                      {[...state.erase, ...(stroke ? [stroke] : [])].map((st, i) => (
+                        <polyline
+                          key={i}
+                          points={st.pts.map(([x, y]) => `${x * dims[0]},${y * dims[1]}`).join(' ')}
+                          fill="none"
+                          stroke="black"
+                          strokeWidth={2 * st.r * dims[0]}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      ))}
+                    </mask>
+                    <image href={result} width={dims[0]} height={dims[1]} mask="url(#sam3-erase)" />
+                  </svg>
+                </>
               )}
-            </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setErasing(!erasing)} className={`${btn} ${erasing ? 'bg-gray-100 dark:bg-zinc-800' : ''}`}>
-                <Eraser size={13} />
-                {t('sam3.eraser')}
-              </button>
-              <button type="button" onClick={undo} disabled={!(erasing ? state.erase : state.points).length} className={btn}>
-                <ArrowUUpLeft size={13} />
-                {t('sam3.undo')}
-              </button>
-              <button type="button" onClick={clear} disabled={!state.points.length && !state.erase.length} className={btn}>
-                <Trash size={13} />
-                {t('sam3.clear')}
-              </button>
-            </div>
-            {erasing && (
-              <div className="group flex flex-col gap-1.5">
-                <div className="flex justify-between">
-                  <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('sam3.brush')}</span>
-                  <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{2 * brush}px</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="40"
-                  step="1"
-                  value={brush}
-                  onChange={(e) => setBrush(parseInt(e.target.value))}
-                  className="w-full accent-[#0ea0ff] disabled:opacity-40"
+              {/* Counter-scaled so dots stay the same size on screen at any zoom. */}
+              {state.points.map(([x, y], i) => (
+                <span
+                  key={i}
+                  style={{ left: `${x * 100}%`, top: `${y * 100}%`, transform: `translate(-50%, -50%) scale(${1 / zoom.s})` }}
+                  className={`absolute w-2.5 h-2.5 rounded-full border-2 border-white pointer-events-none ${
+                    state.labels[i] ? 'bg-[#0ea0ff]' : 'bg-red-500'
+                  }`}
                 />
-              </div>
+              ))}
+            </div>
+            {erasing && hover && (
+              <span
+                style={{ left: hover[0], top: hover[1], width: 2 * brush, height: 2 * brush }}
+                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-white shadow-[0_0_0_1px_rgba(0,0,0,0.4)] pointer-events-none"
+              />
             )}
           </div>
-
-          <div className="group flex flex-col gap-1.5">
-            <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('sam3.preserve')}</span>
-            <button type="button" onClick={() => set({ preserve: !state.preserve })} className="self-start">
-              <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${state.preserve ? 'bg-[#0ea0ff]' : 'bg-gray-300 dark:bg-zinc-600'}`}>
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${state.preserve ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </span>
-            </button>
-          </div>
-
-          {/* Additive: every point is its own object, added (or, right-click, removed) on its own. */}
-          <div className="group flex flex-col gap-1.5">
-            <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('sam3.additive')}</span>
-            <button type="button" onClick={() => set({ additive: !state.additive })} className="self-start">
-              <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${state.additive ? 'bg-[#0ea0ff]' : 'bg-gray-300 dark:bg-zinc-600'}`}>
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${state.additive ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </span>
-            </button>
-          </div>
-
-          {/* Text is the other SAM3 head: one shot behind Run, and only while no point is set. */}
-          <div className="group flex flex-col gap-1">
-            <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{t('sam3.prompt')}</span>
-            <div className="relative">
-              <textarea
-                value={state.text}
-                disabled={state.points.length > 0}
-                onChange={(e) => set({ text: e.target.value })}
-                rows={2}
-                className="input-textarea"
-              />
-              {state.text && !state.points.length && (
-                <button type="button" onClick={() => set({ text: '' })} className="input-clear-btn">
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-async function submit({ images, state }) {
+async function submit({ images, state, run }) {
   const fd = new FormData();
   fd.append('image', images[0]);
   fd.append('text', state.text);
   fd.append('preserve', state.preserve);
-  const r = await apiPost('/sam3', fd);
+  const r = await run('/sam3', fd);
   return { blob: await r.blob(), state };
 }
 
 export default {
   label: 'mode.sam3',
-  // Loaded explicitly: the Run button reads Load model until then, and clicks wait for it.
+  tasks: ['cutout'],
   model: 'sam3',
+  // Loaded explicitly: the Run button reads Load model until then, and clicks wait for it.
+  loadFirst: true,
   initialState,
   Inputs,
+  Result,
   submit,
   // Clicks are live, so Run is only for the text prompt — and only while no point is set.
   canSubmit: ({ images, state }) => images.length > 0 && !state.points.length && !!state.text.trim(),
-  // The image itself is not persisted, so the points it was placed on are meaningless.
+  // The points belong to the image they were placed on, which may not be the one restored.
   restoreState: (state) => ({ ...state, points: [], labels: [], erase: [] }),
 };

@@ -1,5 +1,4 @@
 import { X } from '@phosphor-icons/react';
-import { apiPost } from '../../lib/api';
 import { useLang } from '../../lib/i18n';
 import ImageDropZone from '../ImageDropZone';
 import AdvancedSettings from '../AdvancedSettings';
@@ -10,6 +9,7 @@ const initialState = {
   numImagesPerPrompt: '',
   width: '',
   height: '',
+  seed: '',
 };
 
 const NUM_INPUT_CLASS = 'w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-gray-100 rounded focus:outline-none group-hover:border-gray-400 focus:border-gray-400 dark:group-hover:border-zinc-400 dark:focus:border-zinc-400 placeholder-gray-400 dark:placeholder-gray-500';
@@ -43,6 +43,7 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
             value={state.prompt}
             onChange={(e) => set({ prompt: e.target.value })}
             rows={3}
+            placeholder={t('flux.prompt_example')}
             className="input-textarea"
           />
           {state.prompt && (
@@ -58,20 +59,22 @@ function Inputs({ state, setState, images, setImages, onZoom }) {
         {numField('numImagesPerPrompt', 'flux.num_images', '1', { min: '1' })}
         {numField('width', 'flux.width', '1024')}
         {numField('height', 'flux.height', '1024')}
+        {numField('seed', 'flux.seed')}
       </div>
       </AdvancedSettings>
     </div>
   );
 }
 
-async function submit({ images, state }) {
+async function submit({ images, state, run }) {
   const fd = new FormData();
   for (const img of images) fd.append('images', img);
   fd.append('prompt', state.prompt);
   if (Number.isInteger(state.numImagesPerPrompt)) fd.append('num_images_per_prompt', state.numImagesPerPrompt);
   if (Number.isInteger(state.width)) fd.append('width', state.width);
   if (Number.isInteger(state.height)) fd.append('height', state.height);
-  const r = await apiPost('/flux2klein-fast', fd);
+  if (Number.isInteger(state.seed)) fd.append('seed', state.seed);
+  const r = await run('/flux2klein-fast', fd);
   const { images: b64s } = await r.json();
   const blobs = await Promise.all(
     b64s.map((b) => fetch(`data:image/jpeg;base64,${b}`).then((res) => res.blob()))
@@ -83,9 +86,12 @@ const canSubmit = ({ state }) => !!state.prompt;
 
 export default {
   label: 'mode.flux2klein-fast',
+  tasks: ['generate', 'edit'],
+  model: 'flux2klein-fast',
   initialState,
   Inputs,
   Result: flux2KleinMode.Result,
   submit,
   canSubmit,
+  multi: true,
 };
